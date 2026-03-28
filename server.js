@@ -244,6 +244,21 @@ function loadMarketplaces() {
     marketplaces.push(marketplace);
   }
 
+  // Virtual marketplaces for user/project customizations
+  const userCustom = scanCustomizations(CLAUDE_DIR, 'user');
+  if (userCustom) marketplaces.unshift(userCustom);
+
+  if (projectPath) {
+    const projectClaudeDir = path.join(projectPath, '.claude');
+    if (fs.existsSync(projectClaudeDir)) {
+      const projectCustom = scanCustomizations(projectClaudeDir, 'project');
+      if (projectCustom) {
+        const insertIdx = userCustom ? 1 : 0;
+        marketplaces.splice(insertIdx, 0, projectCustom);
+      }
+    }
+  }
+
   return marketplaces;
 }
 
@@ -333,6 +348,62 @@ function findFiles(dir, ext) {
   return results;
 }
 
+const VIRTUAL_PREFIX = '_custom/';
+const SCOPE_LABELS = { user: 'User Customizations', project: 'Project Customizations' };
+const EMPTY_SCOPE = { installed: false, enabled: false, version: null, installPath: null };
+
+function scanCustomizations(basePath, scope) {
+  const components = countComponents(basePath);
+
+  // Strip .md extensions from command/agent names for cleaner display
+  components.commands = components.commands.map(n => n.replace(/\.md$/, ''));
+  components.agents = components.agents.map(n => n.replace(/\.md$/, ''));
+
+  // Fallback: read hooks from settings.json if hooks.json didn't have any
+  if (!components.hooks.length) {
+    const settings = readJsonSafe(path.join(basePath, 'settings.json'));
+    if (settings?.hooks) {
+      components.hooks = Object.keys(settings.hooks);
+    }
+  }
+
+  const hasAny = Object.values(components).some(v => v.length > 0);
+  if (!hasAny) return null;
+
+  const label = SCOPE_LABELS[scope];
+  const activeScope = { installed: true, enabled: true, version: null, installPath: null };
+  const scopeDetails = {
+    user: scope === 'user' ? activeScope : EMPTY_SCOPE,
+    project: scope === 'project' ? activeScope : EMPTY_SCOPE,
+    local: EMPTY_SCOPE,
+  };
+
+  return {
+    name: label,
+    source: { type: 'directory', repo: null, path: basePath, url: null },
+    installLocation: basePath,
+    lastUpdated: null,
+    isVirtual: true,
+    error: null,
+    plugins: [{
+      name: label,
+      fullId: `${VIRTUAL_PREFIX}${scope}`,
+      description: `Custom skills, commands, agents, hooks, and servers from ${scope === 'user' ? '~/.claude/' : '.claude/'}`,
+      source: '',
+      version: null,
+      isInstalled: true,
+      isEnabled: true,
+      isVirtual: true,
+      scopeDetails,
+      installedScopes: [scope],
+      components,
+      _pluginDir: basePath,
+      _fsComps: components,
+      metadata: {},
+    }],
+  };
+}
+
 function findLatestVersionDir(parentDir) {
   try {
     const subdirs = fs.readdirSync(parentDir, { withFileTypes: true })
@@ -369,9 +440,11 @@ function resolveInstallPath(ip) {
 }
 
 function findPlugin(fullId, marketplaces) {
-  const [pluginName, marketplaceName] = fullId.split('@');
-  const marketplace = marketplaces.find(m => m.name === marketplaceName);
-  return marketplace?.plugins?.find(p => p.name === pluginName) || null;
+  for (const m of marketplaces) {
+    const p = m.plugins?.find(p => p.fullId === fullId);
+    if (p) return p;
+  }
+  return null;
 }
 
 function resolvePluginDir(fullId, marketplaces) {
@@ -394,6 +467,10 @@ app.get('/api/plugins/:pluginId/components', (req, res) => {
   const pluginId = decodeURIComponent(req.params.pluginId);
   const mktData = getCachedMarketplaces();
   const plugin = findPlugin(pluginId, mktData);
+
+  if (plugin?.isVirtual) {
+    return res.json({ ...plugin.components, _pluginDir: plugin._pluginDir });
+  }
   if (!plugin?._pluginDir) return res.status(404).json({ error: 'Plugin directory not found', pluginId });
 
   const comps = plugin._fsComps || countComponents(plugin._pluginDir, plugin.metadata);
@@ -457,9 +534,18 @@ function runClaudePlugin(args) {
   });
 }
 
+function rejectVirtual(pluginId, res) {
+  if (pluginId?.startsWith(VIRTUAL_PREFIX)) {
+    res.status(400).json({ error: 'Cannot modify virtual customization entries' });
+    return true;
+  }
+  return false;
+}
+
 app.post('/api/plugins/install', async (req, res) => {
   const { pluginId, scope } = req.body;
   if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
+  if (rejectVirtual(pluginId, res)) return;
   try {
     const args = ['install', pluginId];
     if (scope) args.push('--scope', scope);
@@ -474,6 +560,7 @@ app.post('/api/plugins/install', async (req, res) => {
 app.post('/api/plugins/uninstall', async (req, res) => {
   const { pluginId, scope } = req.body;
   if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
+  if (rejectVirtual(pluginId, res)) return;
   try {
     const args = ['uninstall', pluginId];
     if (scope) args.push('--scope', scope);
@@ -488,6 +575,7 @@ app.post('/api/plugins/uninstall', async (req, res) => {
 app.post('/api/plugins/enable', async (req, res) => {
   const { pluginId, scope } = req.body;
   if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
+  if (rejectVirtual(pluginId, res)) return;
   try {
     const args = ['enable', pluginId];
     if (scope) args.push('--scope', scope);
@@ -502,6 +590,7 @@ app.post('/api/plugins/enable', async (req, res) => {
 app.post('/api/plugins/disable', async (req, res) => {
   const { pluginId, scope } = req.body;
   if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
+  if (rejectVirtual(pluginId, res)) return;
   try {
     const args = ['disable', pluginId];
     if (scope) args.push('--scope', scope);

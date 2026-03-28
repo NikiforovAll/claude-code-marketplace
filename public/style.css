@@ -368,6 +368,9 @@ body {
   letter-spacing: 0.04em;
   padding: 8px 12px;
 }
+.tree-row.marketplace-row.virtual .tree-icon {
+  color: var(--plan);
+}
 
 .tree-indent {
   flex-shrink: 0;
@@ -542,6 +545,10 @@ body.light .scope-toggle.local {
 .badge-git {
   background: var(--team-dim);
   color: var(--team);
+}
+.badge-virtual {
+  background: var(--plan-dim);
+  color: var(--plan);
 }
 .badge-count {
   font-size: 10px;

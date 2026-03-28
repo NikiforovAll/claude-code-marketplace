@@ -36,6 +36,9 @@ const ICONS = {
   ),
   folder: SVG('<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'),
   file: SVG('<path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/>'),
+  gear: SVG(
+    '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>',
+  ),
   kebab:
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>',
 };
@@ -205,20 +208,24 @@ function renderTree() {
     const plugins = filterPlugins(m.plugins);
     if (plugins.length === 0 && (searchFilter || scopeFilter !== 'all')) continue;
 
-    const srcBadge = sourceBadge(m.source.type);
-    const pluginCount = `<span class="badge-count">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''}</span>`;
+    const srcBadge = m.isVirtual ? '' : sourceBadge(m.source.type);
+    const pluginCount = m.isVirtual
+      ? ''
+      : `<span class="badge-count">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''}</span>`;
 
     const mExpanded = expandedNodes.has(`m_${mid}`) || !!searchFilter;
+    const mIcon = m.isVirtual ? ICONS.gear : ICONS.marketplace;
+    const kebabBtn = m.isVirtual
+      ? ''
+      : `<button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${esc(m.name)}')" title="Marketplace info">${ICONS.kebab}</button>`;
 
-    html += `<div class="tree-row marketplace-row" data-row-type="marketplace" data-row-id="m_${mid}" onclick="toggleChildren('m_${mid}')">
+    html += `<div class="tree-row marketplace-row${m.isVirtual ? ' virtual' : ''}" data-row-type="marketplace" data-row-id="m_${mid}" onclick="toggleChildren('m_${mid}')">
       <span class="tree-chevron${mExpanded ? ' expanded' : ''}" id="chev_m_${mid}">\u25B6</span>
-      <span class="tree-icon">${ICONS.marketplace}</span>
+      <span class="tree-icon">${mIcon}</span>
       <span class="tree-label"><span class="mkt-name">${esc(m.name)}</span></span>
       ${srcBadge}
       ${pluginCount}
-      <button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${esc(m.name)}')" title="Marketplace info">
-${ICONS.kebab}
-      </button>
+      ${kebabBtn}
     </div>`;
 
     html += `<div class="tree-children${mExpanded ? ' open' : ''}" id="children_m_${mid}">`;
@@ -246,15 +253,17 @@ ${ICONS.kebab}
 
 function renderPluginRow(p) {
   const selected = selectedPluginId === p.fullId ? ' selected' : '';
-  const scopes = renderScopeToggles(p);
+  const scopes = p.isVirtual ? '' : renderScopeToggles(p);
   const summary = renderCompSummary(p);
   const ver = p.version ? `<span class="version">v${esc(p.version)}</span>` : '';
+  const virtualCls = p.isVirtual ? ' virtual' : '';
+  const icon = p.isVirtual ? ICONS.gear : ICONS.plugin;
 
   const desc = `<span class="tree-desc-inline">${p.description ? esc(p.description) : ''}</span>`;
 
-  const html = `<div class="tree-row${selected}" data-row-type="plugin" data-row-id="${esc(p.fullId)}" onclick="showDetail('${esc(p.fullId)}')">
+  const html = `<div class="tree-row${selected}${virtualCls}" data-row-type="plugin" data-row-id="${esc(p.fullId)}" onclick="showDetail('${esc(p.fullId)}')">
     <span class="tree-indent" style="width:40px"></span>
-    <span class="tree-icon">${ICONS.plugin}</span>
+    <span class="tree-icon">${icon}</span>
     <span class="tree-label">${esc(p.name)} ${ver}</span>
     ${desc}
     ${scopes}
@@ -312,26 +321,41 @@ async function showDetail(pluginId) {
   const panel = document.getElementById('detailPanel');
   const marketplace = marketplaces.find((m) => m.plugins.some((p) => p.fullId === pluginId));
   const mName = marketplace?.name || '?';
+  const isVirtual = plugin.isVirtual;
 
   const componentsHtml = '<div style="color:var(--text-dim);font-size:12px">Loading components...</div>';
+  const headerIcon = isVirtual ? ICONS.gear : ICONS.plugin;
+
+  const scopeSection = isVirtual
+    ? `<div class="detail-section">
+        <span class="badge badge-virtual">Custom</span>
+        <span class="detail-meta-item" style="margin-left:8px">${esc(plugin.installedScopes?.[0] || '')} scope</span>
+      </div>`
+    : `<div class="detail-section">
+        <h4>Scope Installation</h4>
+        ${renderScopeMatrix(plugin)}
+      </div>`;
+
+  const metaRow = isVirtual
+    ? `<div class="detail-meta-row">
+        <span class="detail-meta-item">${esc(shortenPath(plugin._pluginDir || ''))}</span>
+      </div>`
+    : `<div class="detail-meta-row">
+        <span class="detail-meta-item">from ${esc(mName)}</span>
+        ${sourceBadge(marketplace?.source?.type)}
+      </div>`;
 
   panel.innerHTML = `
     <div class="detail-header">
-      <h3>${ICONS.plugin} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
+      <h3>${headerIcon} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
       <button class="detail-close" onclick="closeDetail()">\u2715</button>
     </div>
     <div class="detail-body">
       <div class="detail-section">
         <p class="detail-desc">${esc(plugin.description || 'No description')}</p>
-        <div class="detail-meta-row">
-          <span class="detail-meta-item">from ${esc(mName)}</span>
-          ${sourceBadge(marketplace?.source?.type)}
-        </div>
+        ${metaRow}
       </div>
-      <div class="detail-section">
-        <h4>Scope Installation</h4>
-        ${renderScopeMatrix(plugin)}
-      </div>
+      ${scopeSection}
       <div class="detail-section">
         <h4>Components</h4>
         <div id="detailComponents">${componentsHtml}</div>
