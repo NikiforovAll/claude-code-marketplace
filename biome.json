@@ -11,6 +11,14 @@
     "rules": {
       "style": {
         "noDescendingSpecificity": "off"
+      },
+      "correctness": {
+        "noUnusedVariables": "off",
+        "noUnusedFunctionParameters": "off"
+      },
+      "suspicious": {
+        "noDuplicateProperties": "off",
+        "useIterableCallbackReturn": "off"
       }
     }
   },
