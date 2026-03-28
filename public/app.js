@@ -101,10 +101,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const savedTheme = localStorage.getItem('theme');
-  if (savedTheme === 'light') {
-    document.body.classList.add('light');
-  } else if (savedTheme === 'dark') {
+  if (savedTheme === 'dark') {
     document.body.classList.add('dark-forced');
+  } else {
+    document.body.classList.add('light');
   }
   syncHljsTheme();
 

@@ -31,8 +31,8 @@
   --scope-user-dim: rgba(196, 149, 106, 0.18);
   --scope-project: #7ab5a0;
   --scope-project-dim: rgba(122, 181, 160, 0.18);
-  --scope-local: #f0b429;
-  --scope-local-dim: rgba(240, 180, 41, 0.18);
+  --scope-local: #8a9bb5;
+  --scope-local-dim: rgba(138, 155, 181, 0.18);
 }
 
 body.light {
@@ -57,43 +57,12 @@ body.light {
   --plan: #5a7a5a;
   --plan-dim: rgba(90, 122, 90, 0.15);
 
-  --scope-user: #9a6d3a;
-  --scope-user-dim: rgba(154, 109, 58, 0.15);
+  --scope-user: #8a7055;
+  --scope-user-dim: rgba(138, 112, 85, 0.12);
   --scope-project: #4d8a72;
   --scope-project-dim: rgba(77, 138, 114, 0.15);
-  --scope-local: #b07d0a;
-  --scope-local-dim: rgba(176, 125, 10, 0.15);
-}
-
-@media (prefers-color-scheme: light) {
-  body:not(.dark-forced) {
-    --bg-deep: #e8e6e3;
-    --bg-surface: #f4f3f1;
-    --bg-elevated: #dddbd8;
-    --bg-hover: #d2d0cc;
-    --border: #a09b94;
-    --text-primary: #0a0a0a;
-    --text-secondary: #444444;
-    --text-tertiary: #666666;
-    --text-muted: #888888;
-    --accent-text: #b85a20;
-    --accent-dim: rgba(232, 111, 51, 0.18);
-    --accent-glow: rgba(232, 111, 51, 0.5);
-    --success: #1a8a5a;
-    --success-dim: rgba(26, 138, 90, 0.15);
-    --warning: #b07d0a;
-    --warning-dim: rgba(176, 125, 10, 0.15);
-    --error: #c53030;
-    --error-dim: rgba(197, 48, 48, 0.15);
-    --plan: #5a7a5a;
-    --plan-dim: rgba(90, 122, 90, 0.15);
-    --scope-user: #9a6d3a;
-    --scope-user-dim: rgba(154, 109, 58, 0.15);
-    --scope-project: #4d8a72;
-    --scope-project-dim: rgba(77, 138, 114, 0.15);
-    --scope-local: #b07d0a;
-    --scope-local-dim: rgba(176, 125, 10, 0.15);
-  }
+  --scope-local: #6b7d96;
+  --scope-local-dim: rgba(107, 125, 150, 0.12);
 }
 
 /* === RESET === */
@@ -459,65 +428,51 @@ body {
   border-color: rgba(196, 149, 106, 0.4);
   color: rgba(196, 149, 106, 0.5);
 }
-.scope-toggle.user.active {
-  background: var(--scope-user-dim);
-  color: var(--scope-user);
-  border-color: var(--scope-user);
-}
+.scope-toggle.user.active,
 .scope-toggle.user.disabled {
   background: var(--scope-user-dim);
   color: var(--scope-user);
   border-color: var(--scope-user);
-  opacity: 0.4;
-  text-decoration: line-through;
 }
 
 .scope-toggle.project {
   border-color: rgba(122, 181, 160, 0.4);
   color: rgba(122, 181, 160, 0.5);
 }
-.scope-toggle.project.active {
-  background: var(--scope-project-dim);
-  color: var(--scope-project);
-  border-color: var(--scope-project);
-}
+.scope-toggle.project.active,
 .scope-toggle.project.disabled {
   background: var(--scope-project-dim);
   color: var(--scope-project);
   border-color: var(--scope-project);
-  opacity: 0.4;
-  text-decoration: line-through;
 }
 
 .scope-toggle.local {
-  border-color: rgba(240, 180, 41, 0.4);
-  color: rgba(240, 180, 41, 0.5);
+  border-color: rgba(138, 155, 181, 0.4);
+  color: rgba(138, 155, 181, 0.5);
 }
-.scope-toggle.local.active {
-  background: var(--scope-local-dim);
-  color: var(--scope-local);
-  border-color: var(--scope-local);
-}
+.scope-toggle.local.active,
 .scope-toggle.local.disabled {
   background: var(--scope-local-dim);
   color: var(--scope-local);
   border-color: var(--scope-local);
+}
+.scope-toggle.disabled {
   opacity: 0.4;
   text-decoration: line-through;
 }
 
 /* Light theme: boost inactive scope contrast further */
 body.light .scope-toggle.user {
-  border-color: rgba(154, 109, 58, 0.5);
-  color: rgba(154, 109, 58, 0.6);
+  border-color: rgba(138, 112, 85, 0.4);
+  color: rgba(138, 112, 85, 0.5);
 }
 body.light .scope-toggle.project {
   border-color: rgba(77, 138, 114, 0.5);
   color: rgba(77, 138, 114, 0.6);
 }
 body.light .scope-toggle.local {
-  border-color: rgba(176, 125, 10, 0.5);
-  color: rgba(176, 125, 10, 0.6);
+  border-color: rgba(107, 125, 150, 0.4);
+  color: rgba(107, 125, 150, 0.5);
 }
 
 /* === BADGES === */
@@ -652,7 +607,7 @@ body.light .scope-toggle.local {
 .tree-desc-inline {
   font-size: 11px;
   color: var(--text-muted);
-  opacity: 0.8;
+  opacity: 0.95;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
