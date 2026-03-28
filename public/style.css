@@ -20,17 +20,17 @@
   --warning-dim: rgba(240, 180, 41, 0.18);
   --error: #ef4444;
   --error-dim: rgba(239, 68, 68, 0.18);
-  --team: #60a5fa;
-  --team-dim: rgba(96, 165, 250, 0.18);
+  --team: #c4956a;
+  --team-dim: rgba(196, 149, 106, 0.18);
   --plan: #86a886;
   --plan-dim: rgba(134, 168, 134, 0.18);
   --mono: 'IBM Plex Mono', monospace;
   --serif: 'Playfair Display', serif;
 
-  --scope-user: #60a5fa;
-  --scope-user-dim: rgba(96, 165, 250, 0.18);
-  --scope-project: #3ecf8e;
-  --scope-project-dim: rgba(62, 207, 142, 0.18);
+  --scope-user: #c4956a;
+  --scope-user-dim: rgba(196, 149, 106, 0.18);
+  --scope-project: #7ab5a0;
+  --scope-project-dim: rgba(122, 181, 160, 0.18);
   --scope-local: #f0b429;
   --scope-local-dim: rgba(240, 180, 41, 0.18);
 }
@@ -57,10 +57,10 @@ body.light {
   --plan: #5a7a5a;
   --plan-dim: rgba(90, 122, 90, 0.15);
 
-  --scope-user: #3b82f6;
-  --scope-user-dim: rgba(59, 130, 246, 0.15);
-  --scope-project: #1a8a5a;
-  --scope-project-dim: rgba(26, 138, 90, 0.15);
+  --scope-user: #9a6d3a;
+  --scope-user-dim: rgba(154, 109, 58, 0.15);
+  --scope-project: #4d8a72;
+  --scope-project-dim: rgba(77, 138, 114, 0.15);
   --scope-local: #b07d0a;
   --scope-local-dim: rgba(176, 125, 10, 0.15);
 }
@@ -87,10 +87,10 @@ body.light {
     --error-dim: rgba(197, 48, 48, 0.15);
     --plan: #5a7a5a;
     --plan-dim: rgba(90, 122, 90, 0.15);
-    --scope-user: #3b82f6;
-    --scope-user-dim: rgba(59, 130, 246, 0.15);
-    --scope-project: #1a8a5a;
-    --scope-project-dim: rgba(26, 138, 90, 0.15);
+    --scope-user: #9a6d3a;
+    --scope-user-dim: rgba(154, 109, 58, 0.15);
+    --scope-project: #4d8a72;
+    --scope-project-dim: rgba(77, 138, 114, 0.15);
     --scope-local: #b07d0a;
     --scope-local-dim: rgba(176, 125, 10, 0.15);
   }
@@ -108,6 +108,7 @@ body {
   line-height: 1.5;
   height: 100vh;
   display: flex;
+  zoom: 1.2;
   flex-direction: column;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -263,50 +264,6 @@ body {
   min-width: 400px;
 }
 
-.scope-legend {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 7px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-surface);
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-}
-.legend-label { font-weight: 600; color: var(--text-tertiary); }
-.legend-item { display: flex; align-items: center; gap: 5px; }
-.legend-dot { width: 8px; height: 8px; border-radius: 2px; }
-.legend-dot.user { background: var(--scope-user); }
-.legend-dot.project { background: var(--scope-project); }
-.legend-dot.local { background: var(--scope-local); }
-.legend-hint { font-size: 10px; color: var(--text-muted); font-style: italic; text-transform: none; letter-spacing: 0; }
-
-.tree-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-surface);
-  flex-shrink: 0;
-}
-.filter-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  user-select: none;
-}
-.filter-toggle input[type="checkbox"] {
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
 .tree-container {
   flex: 1;
   overflow-y: auto;
@@ -374,7 +331,18 @@ body {
   text-overflow: ellipsis;
   color: var(--text-secondary);
 }
-.tree-label .version { color: var(--text-muted); font-size: 10px; margin-left: 6px; }
+.version {
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .tree-label .mkt-name { font-weight: 600; color: var(--text-primary); }
 .tree-meta {
   font-size: 10px;
@@ -402,11 +370,11 @@ body {
 }
 .scope-toggle:hover { transform: scale(1.15); }
 
-.scope-toggle.user { border-color: rgba(96,165,250,0.4); color: rgba(96,165,250,0.5); }
+.scope-toggle.user { border-color: rgba(196,149,106,0.4); color: rgba(196,149,106,0.5); }
 .scope-toggle.user.active { background: var(--scope-user-dim); color: var(--scope-user); border-color: var(--scope-user); }
 .scope-toggle.user.disabled { background: var(--scope-user-dim); color: var(--scope-user); border-color: var(--scope-user); opacity: 0.4; text-decoration: line-through; }
 
-.scope-toggle.project { border-color: rgba(62,207,142,0.4); color: rgba(62,207,142,0.5); }
+.scope-toggle.project { border-color: rgba(122,181,160,0.4); color: rgba(122,181,160,0.5); }
 .scope-toggle.project.active { background: var(--scope-project-dim); color: var(--scope-project); border-color: var(--scope-project); }
 .scope-toggle.project.disabled { background: var(--scope-project-dim); color: var(--scope-project); border-color: var(--scope-project); opacity: 0.4; text-decoration: line-through; }
 
@@ -415,8 +383,8 @@ body {
 .scope-toggle.local.disabled { background: var(--scope-local-dim); color: var(--scope-local); border-color: var(--scope-local); opacity: 0.4; text-decoration: line-through; }
 
 /* Light theme: boost inactive scope contrast further */
-body.light .scope-toggle.user { border-color: rgba(59,130,246,0.5); color: rgba(59,130,246,0.6); }
-body.light .scope-toggle.project { border-color: rgba(26,138,90,0.5); color: rgba(26,138,90,0.6); }
+body.light .scope-toggle.user { border-color: rgba(154,109,58,0.5); color: rgba(154,109,58,0.6); }
+body.light .scope-toggle.project { border-color: rgba(77,138,114,0.5); color: rgba(77,138,114,0.6); }
 body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba(176,125,10,0.6); }
 
 /* === BADGES === */
@@ -430,7 +398,7 @@ body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.badge-github { background: var(--accent-dim); color: var(--accent-text); }
+.badge-github { background: var(--accent-dim); color: var(--accent-text); display: inline-flex; align-items: center; gap: 3px; }
 .badge-directory { background: var(--warning-dim); color: var(--warning); }
 .badge-git { background: var(--team-dim); color: var(--team); }
 .badge-count { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
@@ -481,7 +449,7 @@ body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba
 .tree-desc-inline {
   font-size: 11px;
   color: var(--text-muted);
-  opacity: 0.7;
+  opacity: 0.8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -558,6 +526,7 @@ body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba
   gap: 8px;
 }
 .detail-header h3 svg { width: 16px; height: 16px; opacity: 0.5; }
+.detail-header h3 .version { font-size: 11px; font-weight: 400; }
 .detail-close {
   background: transparent;
   border: 1px solid transparent;
@@ -699,13 +668,6 @@ body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba
 .detail-comp-item:hover { background: var(--bg-hover); color: var(--text-secondary); }
 .detail-comp-item .icon { width: 14px; display: flex; align-items: center; opacity: 0.5; }
 .detail-comp-item .icon svg { width: 12px; height: 12px; }
-
-.comp-type-label {
-  margin-left: auto;
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: lowercase;
-}
 
 /* === CODE PREVIEW === */
 

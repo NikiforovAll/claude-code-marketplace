@@ -3,7 +3,7 @@ let selectedPluginId = null;
 let searchFilter = '';
 let showInstalledOnly = true;
 const expandedNodes = new Set();
-const componentCache = {};
+let componentCache = {};
 let detailHistory = [];
 
 const SVG = (d, w=14) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -18,11 +18,9 @@ const ICONS = {
   lspServers:  SVG('<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>'),
   folder:      SVG('<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'),
   file:        SVG('<path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/>'),
+  kebab:       '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>',
 };
-const COMP_ICONS = {
-  skills: ICONS.skills, commands: ICONS.commands, agents: ICONS.agents,
-  mcpServers: ICONS.mcpServers, hooks: ICONS.hooks, lspServers: ICONS.lspServers,
-};
+const COMP_HAS_DIR = new Set(['skills', 'commands', 'agents']);
 const COMP_LABELS = {
   skills: 'Skills', commands: 'Commands', agents: 'Agents',
   mcpServers: 'MCP Servers', hooks: 'Hooks', lspServers: 'LSP Servers',
@@ -30,13 +28,15 @@ const COMP_LABELS = {
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
-  restoreFromUrl();
+  restoreAppState();
   loadProject();
   loadData();
 
+  let searchTimer;
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchFilter = e.target.value.toLowerCase();
-    renderTree();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(renderTree, 150);
   });
 
   document.getElementById('installedOnlyCheckbox').addEventListener('change', (e) => {
@@ -52,8 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Enter key in modal
   document.getElementById('marketplaceSource').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') submitAddMarketplace();
-    if (e.key === 'Escape') closeModal('addMarketplaceModal');
+    if (e.key === 'Enter') { e.preventDefault(); submitAddMarketplace(); }
+    if (e.key === 'Escape') { e.preventDefault(); closeModal('addMarketplaceModal'); }
   });
 
   const savedTheme = localStorage.getItem('theme');
@@ -93,21 +93,9 @@ async function loadProject() {
 
 async function loadData() {
   try {
+    componentCache = {};
     const res = await fetch('/api/marketplaces');
     marketplaces = await res.json();
-
-    // Auto-expand to selected plugin if set
-    if (selectedPluginId) {
-      for (const m of marketplaces) {
-        const mid = safeId(m.name);
-        const plugin = m.plugins.find(p => p.fullId === selectedPluginId);
-        if (plugin) {
-          expandedNodes.add('m_' + mid);
-          expandedNodes.add('p_' + safeId(plugin.fullId));
-          break;
-        }
-      }
-    }
 
     renderTree();
     if (selectedPluginId) showDetail(selectedPluginId);
@@ -186,7 +174,6 @@ function renderTree() {
 
   let html = '';
 
-  let hasVisiblePlugins = false;
   for (const m of marketplaces) {
     const mid = safeId(m.name);
     const plugins = filterPlugins(m.plugins);
@@ -196,7 +183,6 @@ function renderTree() {
     const pluginCount = `<span class="badge-count">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''}</span>`;
 
     const mExpanded = expandedNodes.has('m_' + mid) || !!searchFilter;
-    hasVisiblePlugins = hasVisiblePlugins || plugins.length > 0;
 
     html += `<div class="tree-row marketplace-row" onclick="toggleChildren('m_${mid}')">
       <span class="tree-chevron${mExpanded ? ' expanded' : ''}" id="chev_m_${mid}">\u25B6</span>
@@ -205,7 +191,7 @@ function renderTree() {
       ${srcBadge}
       ${pluginCount}
       <button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${esc(m.name)}')" title="Marketplace info">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>
+${ICONS.kebab}
       </button>
     </div>`;
 
@@ -229,7 +215,7 @@ function renderPluginRow(p, m) {
   const summary = renderCompSummary(p);
   const ver = p.version ? `<span class="version">v${esc(p.version)}</span>` : '';
 
-  const desc = p.description ? `<span class="tree-desc-inline">${esc(p.description)}</span>` : '';
+  const desc = `<span class="tree-desc-inline">${p.description ? esc(p.description) : ''}</span>`;
 
   let html = `<div class="tree-row${selected}" onclick="showDetail('${esc(p.fullId)}')">
     <span class="tree-indent" style="width:40px"></span>
@@ -239,8 +225,6 @@ function renderPluginRow(p, m) {
     ${scopes}
     ${summary}
   </div>`;
-
-  // No tree children for plugins — components shown in detail sidebar only
 
   return html;
 }
@@ -294,18 +278,16 @@ async function showDetail(pluginId, focusComponent) {
   const mName = marketplace?.name || '?';
 
   let componentsHtml = '<div style="color:var(--text-dim);font-size:12px">Loading components...</div>';
-  let previewHtml = '';
 
   panel.innerHTML = `
     <div class="detail-header">
-      <h3>${ICONS.plugin} ${esc(plugin.name)}</h3>
+      <h3>${ICONS.plugin} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
       <button class="detail-close" onclick="closeDetail()">\u2715</button>
     </div>
     <div class="detail-body">
       <div class="detail-section">
         <p class="detail-desc">${esc(plugin.description || 'No description')}</p>
         <div class="detail-meta-row">
-          ${plugin.version ? `<span class="detail-meta-item">v${esc(plugin.version)}</span>` : ''}
           <span class="detail-meta-item">from ${esc(mName)}</span>
           ${sourceBadge(marketplace?.source?.type)}
         </div>
@@ -379,20 +361,18 @@ function renderDetailComponents(pluginId, comps) {
   );
   if (!entries.length) return '<div style="color:var(--text-dim);font-size:12px">No components found</div>';
 
-  const dirMap = { skills: 'skills', commands: 'commands', agents: 'agents' };
-
   return entries.map(([type, items]) => {
     const names = Array.isArray(items) ? items : [];
     const count = names.length || items;
     let html = `<div class="detail-comp-group">
       <div class="detail-comp-header">
-        <span class="comp-icon">${COMP_ICONS[type] || ''}</span>
+        <span class="comp-icon">${ICONS[type] || ''}</span>
         ${COMP_LABELS[type] || type}
         <span class="count">${count}</span>
       </div>`;
 
     if (names.length) {
-      const dir = dirMap[type];
+      const dir = COMP_HAS_DIR.has(type) ? type : null;
       html += '<div class="detail-comp-items">';
       for (const name of names) {
         const clickPath = dir ? `${dir}/${name}` : name;
@@ -407,30 +387,6 @@ function renderDetailComponents(pluginId, comps) {
     html += '</div>';
     return html;
   }).join('');
-}
-
-async function previewComponent(pluginId, type, names) {
-  const section = document.getElementById('detailPreview');
-  const content = document.getElementById('detailPreviewContent');
-  if (!section || !content) return;
-
-  section.style.display = 'block';
-
-  const dirMap = { skills: 'skills', commands: 'commands', agents: 'agents' };
-  const dir = dirMap[type];
-
-  if (dir && names.length) {
-    let html = '';
-    for (const name of names) {
-      html += `<div class="file-tree-item" onclick="loadFilePreview('${esc(pluginId)}', '${dir}/${name}')">
-        <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
-        ${esc(name)}
-      </div>`;
-    }
-    content.innerHTML = html;
-  } else {
-    content.innerHTML = `<div class="code-preview">${esc(type)}: ${names.length || '?'} items</div>`;
-  }
 }
 
 async function loadFilePreview(pluginId, filePath) {
@@ -507,7 +463,7 @@ function showMarketplaceDetail(name) {
         <h4>Plugins</h4>
         ${m.plugins.map(p => {
           const status = p.isInstalled ? (p.isEnabled ? '<span style="color:var(--success)">enabled</span>' : '<span style="color:var(--warning)">disabled</span>') : '<span style="color:var(--text-muted)">not installed</span>';
-          return `<div class="mkt-plugin-item" onclick="detailHistory.push({type:'marketplace',name:'${esc(m.name)}'}); showDetail('${esc(p.fullId)}')">${esc(p.name)} ${status}</div>`;
+          return `<div class="mkt-plugin-item" onclick="if(detailHistory.length<20)detailHistory.push({type:'marketplace',name:'${esc(m.name)}'}); showDetail('${esc(p.fullId)}')">${esc(p.name)} ${status}</div>`;
         }).join('')}
       </div>
     </div>
@@ -515,23 +471,7 @@ function showMarketplaceDetail(name) {
 }
 
 async function runMarketplaceAction(action, name) {
-  toast(`Running ${action}...`, 'info');
-  try {
-    const res = await fetch(`/api/marketplace/${action}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      toast(data.error || 'Action failed', 'error');
-      return;
-    }
-    toast(`Marketplace ${action} successful`, 'success');
-    await loadData();
-  } catch (err) {
-    toast(err.message, 'error');
-  }
+  await postAndReload(`/api/marketplace/${action}`, { name }, action);
 }
 
 function closeDetail() {
@@ -569,19 +509,23 @@ async function scopeAction(pluginId, scope) {
 }
 
 async function runAction(action, pluginId, scope) {
-  toast(`Running ${action}...`, 'info');
+  await postAndReload(`/api/plugins/${action}`, { pluginId, scope }, action);
+}
+
+async function postAndReload(url, body, label) {
+  toast(`Running ${label}...`, 'info');
   try {
-    const res = await fetch(`/api/plugins/${action}`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pluginId, scope }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) {
       toast(data.error || 'Action failed', 'error');
       return;
     }
-    toast(`${action} successful`, 'success');
+    toast(`${label} successful`, 'success');
     await loadData();
   } catch (err) {
     toast(err.message, 'error');
@@ -600,7 +544,7 @@ function updateUrl() {
   history.replaceState(null, '', url);
 }
 
-function restoreFromUrl() {
+function restoreAppState() {
   const params = new URLSearchParams(window.location.search);
   if (params.has('q')) {
     searchFilter = params.get('q');
@@ -614,6 +558,10 @@ function restoreFromUrl() {
   if (params.has('plugin')) {
     selectedPluginId = params.get('plugin');
   }
+  try {
+    const saved = JSON.parse(localStorage.getItem('expandedNodes') || '[]');
+    saved.forEach(n => expandedNodes.add(n));
+  } catch {}
 }
 
 async function fetchComponents(pluginId) {
@@ -635,6 +583,7 @@ function toggleChildren(id) {
     ch?.classList.toggle('expanded', isOpen);
     if (isOpen) expandedNodes.add(id);
     else expandedNodes.delete(id);
+    saveExpandedNodes();
   }
 }
 
@@ -679,13 +628,15 @@ function timeAgo(date) {
   return date.toLocaleDateString();
 }
 
+function saveExpandedNodes() {
+  localStorage.setItem('expandedNodes', JSON.stringify([...expandedNodes]));
+}
+
 function safeId(str) { return str.replace(/[^a-zA-Z0-9_-]/g, '_'); }
 
 function esc(str) {
   if (!str) return '';
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function shortenPath(p) {
@@ -739,4 +690,8 @@ async function submitAddMarketplace() {
     btn.disabled = false;
     btn.textContent = 'Add';
   }
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
 }
