@@ -225,7 +225,9 @@ function renderTree() {
     return;
   }
 
-  let html = '';
+  const allIds = marketplaces.map((m) => `m_${safeId(m.name)}`);
+  const allExpanded = allIds.length > 0 && allIds.every((id) => expandedNodes.has(id));
+  let html = `<div class="tree-expand-toggle" id="toggleExpandBtn" onclick="toggleExpandAll()">${allExpanded ? 'Collapse All' : 'Expand All'}</div>`;
 
   for (const m of marketplaces) {
     const mid = safeId(m.name);
@@ -810,6 +812,17 @@ function toggleChildren(id) {
   }
 }
 
+function toggleExpandAll() {
+  const allIds = marketplaces.map((m) => `m_${safeId(m.name)}`);
+  const collapse = allIds.length > 0 && allIds.every((id) => expandedNodes.has(id));
+  for (const id of allIds) {
+    if (collapse) expandedNodes.delete(id);
+    else expandedNodes.add(id);
+  }
+  saveExpandedNodes();
+  renderTree();
+}
+
 function findPlugin(id) {
   for (const m of marketplaces) {
     const p = m.plugins.find((p) => p.fullId === id);
@@ -995,6 +1008,12 @@ function handleKeydown(e) {
   if (matchKey(e, 's')) {
     e.preventDefault();
     document.getElementById('scopeFilter').focus();
+    return;
+  }
+
+  if (matchKey(e, 'e')) {
+    e.preventDefault();
+    toggleExpandAll();
     return;
   }
 

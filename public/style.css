@@ -286,6 +286,19 @@ body {
   min-width: 400px;
 }
 
+.tree-expand-toggle {
+  padding: 4px 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--mono);
+}
+.tree-expand-toggle:hover {
+  color: var(--accent);
+}
+
 .tree-container {
   flex: 1;
   min-height: 0;
