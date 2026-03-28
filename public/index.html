@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Claude Code Marketplace</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" id="hljsDark">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css" id="hljsLight" disabled>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/svg+xml" href="/icons/icon-svg.svg">
 <meta name="theme-color" content="#101114" media="(prefers-color-scheme: dark)">
@@ -121,6 +124,23 @@
               <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd></td><td>Select / toggle</td></tr>
             </table>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content modal -->
+  <div class="modal-overlay" id="contentModal">
+    <div class="modal content-modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="contentModalTitle">File Preview</h3>
+        <button class="modal-close" onclick="closeModal('contentModal')">&#10005;</button>
+      </div>
+      <div class="content-modal-body">
+        <div class="content-tree" id="contentTree"></div>
+        <div class="content-viewer" id="contentViewer">
+          <div class="content-viewer-path" id="contentViewerPath"></div>
+          <pre class="content-viewer-code" id="contentViewerCode"><code></code></pre>
         </div>
       </div>
     </div>

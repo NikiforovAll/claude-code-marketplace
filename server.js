@@ -321,12 +321,17 @@ function countComponents(pluginDir, meta = {}) {
     } catch {}
   }
 
+  const configFiles = {};
+
   // MCPs
   const mcpPath = meta.mcpServers || '.mcp.json';
   const mcpFile = path.resolve(pluginDir, mcpPath);
   if (fs.existsSync(mcpFile) && fs.statSync(mcpFile).isFile()) {
     const data = readJsonSafe(mcpFile);
-    if (data) result.mcpServers = Object.keys(data.mcpServers || data);
+    if (data) {
+      result.mcpServers = Object.keys(data.mcpServers || data);
+      if (result.mcpServers.length) configFiles.mcpServers = mcpPath;
+    }
   }
 
   // Hooks
@@ -337,6 +342,7 @@ function countComponents(pluginDir, meta = {}) {
     if (data) {
       const hooksObj = data.hooks || data;
       result.hooks = Object.keys(hooksObj).filter(k => k !== 'description');
+      if (result.hooks.length) configFiles.hooks = hooksPath;
     }
   }
 
@@ -345,9 +351,13 @@ function countComponents(pluginDir, meta = {}) {
   const lspFile = path.resolve(pluginDir, lspPath);
   if (fs.existsSync(lspFile) && fs.statSync(lspFile).isFile()) {
     const data = readJsonSafe(lspFile);
-    if (data) result.lspServers = Object.keys(data.lspServers || data);
+    if (data) {
+      result.lspServers = Object.keys(data.lspServers || data);
+      if (result.lspServers.length) configFiles.lspServers = lspPath;
+    }
   }
 
+  result._configFiles = configFiles;
   return result;
 }
 
@@ -382,10 +392,20 @@ function scanCustomizations(basePath, scope) {
     const settings = readJsonSafe(path.join(basePath, 'settings.json'));
     if (settings?.hooks) {
       components.hooks = Object.keys(settings.hooks);
+      if (components.hooks.length) {
+        if (!components._configFiles) components._configFiles = {};
+        components._configFiles.hooks = 'settings.json';
+      }
     }
   }
 
-  const hasAny = Object.values(components).some(v => v.length > 0);
+  // Add settings files as browsable entries
+  const settingsFiles = [];
+  if (fs.existsSync(path.join(basePath, 'settings.json'))) settingsFiles.push('settings.json');
+  if (fs.existsSync(path.join(basePath, 'settings.local.json'))) settingsFiles.push('settings.local.json');
+  if (settingsFiles.length) components.settings = settingsFiles;
+
+  const hasAny = Object.values(components).some(v => Array.isArray(v) && v.length > 0);
   if (!hasAny) return null;
 
   const label = SCOPE_LABELS[scope];

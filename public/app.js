@@ -42,6 +42,7 @@ const ICONS = {
   kebab:
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>',
 };
+ICONS.settings = ICONS.gear;
 const COMP_HAS_DIR = new Set(['skills', 'commands', 'agents']);
 const COMP_LABELS = {
   skills: 'Skills',
@@ -50,6 +51,7 @@ const COMP_LABELS = {
   mcpServers: 'MCP Servers',
   hooks: 'Hooks',
   lspServers: 'LSP Servers',
+  settings: 'Settings',
 };
 
 function updateArrow(p) {
@@ -104,9 +106,18 @@ document.addEventListener('DOMContentLoaded', () => {
   } else if (savedTheme === 'dark') {
     document.body.classList.add('dark-forced');
   }
+  syncHljsTheme();
 
   document.addEventListener('keydown', handleKeydown);
 });
+
+function syncHljsTheme() {
+  const light = document.body.classList.contains('light');
+  const darkSheet = document.getElementById('hljsDark');
+  const lightSheet = document.getElementById('hljsLight');
+  if (darkSheet) darkSheet.disabled = light;
+  if (lightSheet) lightSheet.disabled = !light;
+}
 
 function toggleTheme() {
   const isLight = document.body.classList.contains('light');
@@ -118,6 +129,7 @@ function toggleTheme() {
     document.body.classList.add('light');
     localStorage.setItem('theme', 'light');
   }
+  syncHljsTheme();
 }
 
 async function loadProject() {
@@ -317,6 +329,7 @@ function renderCompSummary(plugin) {
   if (!plugin.components) return '';
   const parts = [];
   for (const [k, v] of Object.entries(plugin.components)) {
+    if (k === 'settings' || k.startsWith('_')) continue;
     const count = Array.isArray(v) ? v.length : v;
     if (count > 0) parts.push(`${count} ${COMP_LABELS[k]?.toLowerCase() || k}`);
   }
@@ -386,16 +399,13 @@ async function showDetail(pluginId) {
         <h4>Components</h4>
         <div id="detailComponents">${componentsHtml}</div>
       </div>
-      <div class="detail-section" id="detailPreview" style="display:none">
-        <h4>Preview</h4>
-        <div id="detailPreviewContent"></div>
-      </div>
     </div>
   `;
 
   const comps = (await fetchComponents(pluginId)) || plugin.components || {};
+  const hasDirAccess = !!comps._pluginDir;
   const el = document.getElementById('detailComponents');
-  if (el) el.innerHTML = renderDetailComponents(pluginId, comps);
+  if (el) el.innerHTML = renderDetailComponents(pluginId, comps, hasDirAccess);
 }
 
 function renderScopeMatrix(plugin) {
@@ -431,9 +441,10 @@ function renderScopeMatrix(plugin) {
     .join('')}</div>`;
 }
 
-function renderDetailComponents(pluginId, comps) {
+function renderDetailComponents(pluginId, comps, hasDirAccess) {
+  const configFiles = comps._configFiles || {};
   const entries = Object.entries(comps).filter(
-    ([k, v]) => k !== '_pluginDir' && (Array.isArray(v) ? v.length > 0 : v > 0),
+    ([k, v]) => !k.startsWith('_') && (Array.isArray(v) ? v.length > 0 : v > 0),
   );
   if (!entries.length) return '<div style="color:var(--text-dim);font-size:12px">No components found</div>';
 
@@ -449,14 +460,19 @@ function renderDetailComponents(pluginId, comps) {
       </div>`;
 
       if (names.length) {
+        const configFile = configFiles[type];
         const dir = COMP_HAS_DIR.has(type) ? type : null;
         html += '<div class="detail-comp-items">';
         for (const name of names) {
-          const clickPath = dir ? `${dir}/${name}` : name;
-          html += `<div class="detail-comp-item" onclick="loadFilePreview('${esc(pluginId)}', '${esc(clickPath)}')">
-          <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
-          ${esc(name)}
-        </div>`;
+          const clickPath = configFile || (dir ? `${dir}/${name}` : name);
+          const cls = hasDirAccess ? '' : ' disabled';
+          const click = hasDirAccess
+            ? ` onclick="openContentModal('${esc(pluginId)}', '${esc(clickPath)}', '${esc(type)}')"`
+            : '';
+          html += `<div class="detail-comp-item${cls}"${click}>
+            <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
+            ${esc(name)}
+          </div>`;
         }
         html += '</div>';
       }
@@ -467,10 +483,125 @@ function renderDetailComponents(pluginId, comps) {
     .join('');
 }
 
-async function loadFilePreview(pluginId, filePath) {
-  const content = document.getElementById('detailPreviewContent');
-  if (!content) return;
-  content.innerHTML = '<div style="color:var(--text-dim);font-size:12px">Loading...</div>';
+const EXT_TO_LANG = {
+  md: 'markdown',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  js: 'javascript',
+  ts: 'typescript',
+  py: 'python',
+  sh: 'bash',
+  bash: 'bash',
+  css: 'css',
+  html: 'xml',
+  xml: 'xml',
+  toml: 'ini',
+};
+
+const PREFERRED_FILE = 'SKILL.MD';
+let _contentCodeEl = null;
+
+function highlightSource(text, fileName) {
+  const ext = (fileName || '').split('.').pop().toLowerCase();
+  const lang = EXT_TO_LANG[ext];
+  if (typeof hljs === 'undefined' || !lang) return esc(text);
+  try {
+    if (lang === 'markdown') {
+      const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+      if (fm) {
+        const fmHtml = hljs.highlight(fm[1], { language: 'yaml' }).value;
+        const bodyHtml = hljs.highlight(fm[2], { language: 'markdown' }).value;
+        return `<span class="hl-frontmatter">---</span>\n${fmHtml}\n<span class="hl-frontmatter">---</span>\n${bodyHtml}`;
+      }
+    }
+    return hljs.highlight(text, { language: lang }).value;
+  } catch {}
+  return esc(text);
+}
+
+function getContentCodeEl() {
+  if (!_contentCodeEl) {
+    const pre = document.getElementById('contentViewerCode');
+    _contentCodeEl = pre.querySelector('code') || pre;
+  }
+  return _contentCodeEl;
+}
+
+async function openContentModal(pluginId, initialPath, componentType) {
+  const plugin = findPlugin(pluginId);
+  const label = COMP_LABELS[componentType] || componentType;
+  document.getElementById('contentModalTitle').textContent = `${plugin?.name || pluginId} \u2014 ${label}`;
+
+  const tree = document.getElementById('contentTree');
+  const codeEl = getContentCodeEl();
+  const pathEl = document.getElementById('contentViewerPath');
+  tree.innerHTML = '';
+  codeEl.innerHTML = '';
+  pathEl.textContent = '';
+
+  document.getElementById('contentModal').classList.add('open');
+  await loadContentTree(pluginId, initialPath, tree, 0, true);
+}
+
+async function loadContentTree(pluginId, treePath, container, depth, autoSelect) {
+  try {
+    const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/preview/${treePath}`);
+    if (!res.ok) throw new Error('Not found');
+    const data = await res.json();
+
+    if (data.type === 'directory') {
+      let firstFile = null;
+      let preferredFile = null;
+      for (const entry of data.entries) {
+        const subPath = `${treePath}/${entry.name}`;
+        const item = document.createElement('div');
+        item.className = 'content-tree-item';
+        item.style.paddingLeft = `${12 + depth * 14}px`;
+        item.dataset.path = subPath;
+        item.innerHTML = `<span class="icon">${entry.isDirectory ? ICONS.folder : ICONS.file}</span>${esc(entry.name)}`;
+
+        if (entry.isDirectory) {
+          let expanded = false;
+          const childContainer = document.createElement('div');
+          childContainer.className = 'content-tree-children';
+          childContainer.style.display = 'none';
+          item.addEventListener('click', async () => {
+            expanded = !expanded;
+            if (expanded && !childContainer.children.length) {
+              await loadContentTree(pluginId, subPath, childContainer, depth + 1, false);
+            }
+            childContainer.style.display = expanded ? 'block' : 'none';
+          });
+          container.appendChild(item);
+          container.appendChild(childContainer);
+        } else {
+          if (!firstFile) firstFile = subPath;
+          if (entry.name.toUpperCase() === PREFERRED_FILE) preferredFile = subPath;
+          item.addEventListener('click', () => loadContentFile(pluginId, subPath));
+          container.appendChild(item);
+        }
+      }
+      if (autoSelect && (preferredFile || firstFile)) {
+        await loadContentFile(pluginId, preferredFile || firstFile);
+      }
+    } else {
+      await loadContentFile(pluginId, treePath);
+    }
+  } catch {
+    container.innerHTML = '<div style="color:var(--error);font-size:11px;padding:8px 12px">Failed to load</div>';
+  }
+}
+
+async function loadContentFile(pluginId, filePath) {
+  const codeEl = getContentCodeEl();
+  const pathEl = document.getElementById('contentViewerPath');
+  pathEl.textContent = filePath;
+  codeEl.innerHTML = '<span style="color:var(--text-dim)">Loading...</span>';
+
+  document.querySelectorAll('#contentTree .content-tree-item.active').forEach((el) => el.classList.remove('active'));
+  const activeItem = document.querySelector(`#contentTree .content-tree-item[data-path="${CSS.escape(filePath)}"]`);
+  if (activeItem) activeItem.classList.add('active');
 
   try {
     const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/preview/${filePath}`);
@@ -478,22 +609,23 @@ async function loadFilePreview(pluginId, filePath) {
     const data = await res.json();
 
     if (data.type === 'directory') {
-      let html = `<div style="margin-bottom:8px;font-size:11px;color:var(--text-dim)">${esc(filePath)}/</div>`;
-      for (const entry of data.entries) {
-        const icon = entry.isDirectory ? ICONS.folder : ICONS.file;
-        const subPath = `${filePath}/${entry.name}`;
-        html += `<div class="file-tree-item" onclick="loadFilePreview('${esc(pluginId)}', '${esc(subPath)}')">
-          <span class="icon">${icon}</span>
-          ${esc(entry.name)}
-        </div>`;
-      }
-      content.innerHTML = html;
-    } else {
-      content.innerHTML = `<div style="margin-bottom:8px;font-size:11px;color:var(--text-dim)">${esc(data.name)}</div>
-        <div class="code-preview">${esc(data.content)}</div>`;
+      codeEl.innerHTML = `<span style="color:var(--text-dim)">(directory with ${data.entries.length} entries)</span>`;
+      return;
     }
+
+    if (!data.content) {
+      codeEl.innerHTML = '<span style="color:var(--text-dim)">(empty file)</span>';
+      return;
+    }
+
+    if (data.content.length > 100000) {
+      codeEl.innerHTML = `${highlightSource(data.content.slice(0, 100000), data.name)}\n\n--- truncated (100KB limit) ---`;
+      return;
+    }
+
+    codeEl.innerHTML = highlightSource(data.content, data.name);
   } catch {
-    content.innerHTML = '<div style="color:var(--error);font-size:12px">Failed to load preview</div>';
+    codeEl.innerHTML = '<span style="color:var(--error)">Failed to load file</span>';
   }
 }
 
