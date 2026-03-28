@@ -3,6 +3,8 @@ let selectedPluginId = null;
 let searchFilter = '';
 let showInstalledOnly = true;
 const expandedNodes = new Set();
+const componentCache = {};
+let detailHistory = [];
 
 const COMP_ICONS = {
   skills: '\u26A1', commands: '\u25B6', agents: '\uD83E\uDD16',
@@ -21,6 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchFilter = e.target.value.toLowerCase();
+    renderTree();
+  });
+
+  document.getElementById('installedOnlyCheckbox').addEventListener('change', (e) => {
+    showInstalledOnly = e.target.checked;
     renderTree();
   });
 
@@ -91,6 +98,15 @@ async function loadData() {
 
     renderTree();
     if (selectedPluginId) showDetail(selectedPluginId);
+
+    // Prefetch components for all plugins in background
+    for (const m of marketplaces) {
+      for (const p of m.plugins) {
+        if (!componentCache[p.fullId]) {
+          fetchComponents(p.fullId);
+        }
+      }
+    }
   } catch (err) {
     document.getElementById('treeContainer').innerHTML =
       `<div class="loading" style="color:var(--error)">Failed to load: ${err.message}</div>`;
@@ -155,12 +171,7 @@ function renderTree() {
     return;
   }
 
-  let html = `<div class="tree-toolbar">
-    <label class="filter-toggle">
-      <input type="checkbox" ${showInstalledOnly ? 'checked' : ''} onchange="showInstalledOnly=this.checked; renderTree()">
-      <span>Installed only</span>
-    </label>
-  </div>`;
+  let html = '';
 
   let hasVisiblePlugins = false;
   for (const m of marketplaces) {
@@ -180,6 +191,9 @@ function renderTree() {
       <span class="tree-label"><span class="mkt-name">${esc(m.name)}</span></span>
       ${srcBadge}
       ${pluginCount}
+      <button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${esc(m.name)}')" title="Marketplace info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>
+      </button>
     </div>`;
 
     html += `<div class="tree-children${mExpanded ? ' open' : ''}" id="children_m_${mid}">`;
@@ -202,34 +216,18 @@ function renderPluginRow(p, m) {
   const summary = renderCompSummary(p);
   const ver = p.version ? `<span class="version">v${esc(p.version)}</span>` : '';
 
-  const pExpanded = expandedNodes.has('p_' + pid);
+  const desc = p.description ? `<span class="tree-desc-inline">${esc(p.description)}</span>` : '';
 
-  let html = `<div class="tree-row${selected}" onclick="toggleChildren('p_${pid}'); showDetail('${esc(p.fullId)}')">
-    <span class="tree-indent" style="width:20px"></span>
-    <span class="tree-chevron${pExpanded ? ' expanded' : ''}" id="chev_p_${pid}">\u25B6</span>
+  let html = `<div class="tree-row${selected}" onclick="showDetail('${esc(p.fullId)}')">
+    <span class="tree-indent" style="width:40px"></span>
     <span class="tree-icon">\uD83D\uDCE6</span>
     <span class="tree-label">${esc(p.name)} ${ver}</span>
+    ${desc}
     ${scopes}
     ${summary}
   </div>`;
 
-  if (p.description) {
-    html += `<div class="tree-desc">${esc(p.description)}</div>`;
-  }
-
-  html += `<div class="tree-children${pExpanded ? ' open' : ''}" id="children_p_${pid}">`;
-  if (p.components) {
-    for (const [type, count] of Object.entries(p.components)) {
-      if (count > 0) {
-        html += `<div class="comp-row" onclick="event.stopPropagation(); showDetail('${esc(p.fullId)}', '${type}')">
-          <span class="comp-icon">${COMP_ICONS[type] || ''}</span>
-          <span>${COMP_LABELS[type] || type}</span>
-          <span class="comp-count">${count}</span>
-        </div>`;
-      }
-    }
-  }
-  html += `</div>`;
+  // No tree children for plugins — components shown in detail sidebar only
 
   return html;
 }
@@ -316,9 +314,15 @@ async function showDetail(pluginId, focusComponent) {
 
   // Load actual components from filesystem
   try {
-    const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/components`);
-    if (res.ok) {
-      const comps = await res.json();
+    let comps = componentCache[pluginId];
+    if (!comps) {
+      const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/components`);
+      if (res.ok) {
+        comps = await res.json();
+        componentCache[pluginId] = comps;
+      }
+    }
+    if (comps) {
       const el = document.getElementById('detailComponents');
       if (el) el.innerHTML = renderDetailComponents(pluginId, comps);
     }
@@ -357,19 +361,38 @@ function renderScopeMatrix(plugin) {
 }
 
 function renderDetailComponents(pluginId, comps) {
-  const entries = Object.entries(comps).filter(([, v]) =>
-    Array.isArray(v) ? v.length > 0 : v > 0
+  const entries = Object.entries(comps).filter(([k, v]) =>
+    k !== '_pluginDir' && (Array.isArray(v) ? v.length > 0 : v > 0)
   );
   if (!entries.length) return '<div style="color:var(--text-dim);font-size:12px">No components found</div>';
 
+  const dirMap = { skills: 'skills', commands: 'commands', agents: 'agents' };
+
   return entries.map(([type, items]) => {
-    const count = Array.isArray(items) ? items.length : items;
     const names = Array.isArray(items) ? items : [];
-    return `<div class="detail-comp-row" onclick="previewComponent('${esc(pluginId)}', '${type}', ${JSON.stringify(names)})">
-      <span style="font-size:14px">${COMP_ICONS[type] || ''}</span>
-      ${COMP_LABELS[type] || type}
-      <span class="count">${count}</span>
-    </div>`;
+    const count = names.length || items;
+    let html = `<div class="detail-comp-group">
+      <div class="detail-comp-header">
+        <span style="font-size:14px">${COMP_ICONS[type] || ''}</span>
+        ${COMP_LABELS[type] || type}
+        <span class="count">${count}</span>
+      </div>`;
+
+    if (names.length) {
+      const dir = dirMap[type];
+      html += '<div class="detail-comp-items">';
+      for (const name of names) {
+        const clickPath = dir ? `${dir}/${name}` : name;
+        html += `<div class="detail-comp-item" onclick="loadFilePreview('${esc(pluginId)}', '${esc(clickPath)}')">
+          <span class="icon">${type === 'skills' ? '\uD83D\uDCC1' : '\uD83D\uDCC4'}</span>
+          ${esc(name)}
+        </div>`;
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
   }).join('');
 }
 
@@ -427,7 +450,85 @@ async function loadFilePreview(pluginId, filePath) {
   }
 }
 
+function showMarketplaceDetail(name) {
+  selectedPluginId = null;
+  updateUrl();
+  document.querySelectorAll('.tree-row.selected').forEach(r => r.classList.remove('selected'));
+
+  const m = marketplaces.find(m => m.name === name);
+  if (!m) return;
+
+  const panel = document.getElementById('detailPanel');
+  const installed = m.plugins.filter(p => p.isInstalled).length;
+  const total = m.plugins.length;
+  const srcType = m.source.type || 'unknown';
+  const srcDetail = m.source.repo || m.source.path || m.source.url || '';
+  const updated = m.lastUpdated ? timeAgo(new Date(m.lastUpdated)) : 'unknown';
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <h3>\uD83C\uDFEB ${esc(m.name)}</h3>
+      <button class="detail-close" onclick="closeDetail()">\u2715</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-section">
+        <div class="detail-meta-grid">
+          <span class="meta-label">Source</span>
+          <span class="meta-value">${sourceBadge(srcType)} ${esc(srcDetail)}</span>
+          <span class="meta-label">Location</span>
+          <span class="meta-value" style="word-break:break-all;font-size:11px">${esc(m.installLocation || '?')}</span>
+          <span class="meta-label">Last updated</span>
+          <span class="meta-value">${esc(updated)}</span>
+          <span class="meta-label">Plugins</span>
+          <span class="meta-value">${installed} installed / ${total} total</span>
+        </div>
+      </div>
+      <div class="detail-section">
+        <h4>Actions</h4>
+        <div class="mkt-actions">
+          <button class="action-btn primary" onclick="runMarketplaceAction('update', '${esc(m.name)}')">Update</button>
+          <button class="action-btn danger" onclick="runMarketplaceAction('remove', '${esc(m.name)}')">Remove</button>
+        </div>
+      </div>
+      <div class="detail-section">
+        <h4>Plugins</h4>
+        ${m.plugins.map(p => {
+          const status = p.isInstalled ? (p.isEnabled ? '<span style="color:var(--success)">enabled</span>' : '<span style="color:var(--warning)">disabled</span>') : '<span style="color:var(--text-muted)">not installed</span>';
+          return `<div class="mkt-plugin-item" onclick="detailHistory.push({type:'marketplace',name:'${esc(m.name)}'}); showDetail('${esc(p.fullId)}')">${esc(p.name)} ${status}</div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+async function runMarketplaceAction(action, name) {
+  toast(`Running ${action}...`, 'info');
+  try {
+    const res = await fetch(`/api/marketplace/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast(data.error || 'Action failed', 'error');
+      return;
+    }
+    toast(`Marketplace ${action} successful`, 'success');
+    await loadData();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
 function closeDetail() {
+  const prev = detailHistory.pop();
+  if (prev) {
+    if (prev.type === 'marketplace') {
+      showMarketplaceDetail(prev.name);
+      return;
+    }
+  }
   selectedPluginId = null;
   updateUrl();
   document.querySelectorAll('.tree-row.selected').forEach(r => r.classList.remove('selected'));
@@ -494,10 +595,21 @@ function restoreFromUrl() {
   }
   if (params.get('all') === '1') {
     showInstalledOnly = false;
+    const cb = document.getElementById('installedOnlyCheckbox');
+    if (cb) cb.checked = false;
   }
   if (params.has('plugin')) {
     selectedPluginId = params.get('plugin');
   }
+}
+
+async function fetchComponents(pluginId) {
+  try {
+    const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/components`);
+    if (res.ok) {
+      componentCache[pluginId] = await res.json();
+    }
+  } catch {}
 }
 
 // --- Helpers ---
@@ -540,6 +652,18 @@ function sourceBadge(type) {
   if (type === 'directory') return '<span class="badge badge-directory">Local</span>';
   if (type === 'git') return '<span class="badge badge-git">Git</span>';
   return `<span class="badge" style="background:var(--accent-dim);color:var(--accent)">${esc(type || '?')}</span>`;
+}
+
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return date.toLocaleDateString();
 }
 
 function safeId(str) { return str.replace(/[^a-zA-Z0-9_-]/g, '_'); }

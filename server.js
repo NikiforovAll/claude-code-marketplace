@@ -273,7 +273,10 @@ function countComponents(pluginDir, meta = {}) {
   const hooksFile = path.resolve(pluginDir, hooksPath);
   if (fs.existsSync(hooksFile) && fs.statSync(hooksFile).isFile()) {
     const data = readJsonSafe(hooksFile);
-    if (data) result.hooks = Object.keys(data);
+    if (data) {
+      const hooksObj = data.hooks || data;
+      result.hooks = Object.keys(hooksObj).filter(k => k !== 'description');
+    }
   }
 
   // LSP

@@ -17,6 +17,10 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="text" id="searchInput" placeholder="Filter plugins..." autocomplete="off">
     </div>
+    <label class="topbar-filter-toggle">
+      <input type="checkbox" id="installedOnlyCheckbox" checked>
+      <span>Installed</span>
+    </label>
     <div class="topbar-project" id="projectBtn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
       <span id="projectPath"></span>
@@ -36,14 +40,6 @@
 
   <div class="main-layout">
     <div class="tree-panel">
-      <div class="scope-legend">
-        <span class="legend-label">Scopes:</span>
-        <span class="legend-item"><span class="legend-dot user"></span>User</span>
-        <span class="legend-item"><span class="legend-dot project"></span>Project</span>
-        <span class="legend-item"><span class="legend-dot local"></span>Local</span>
-        <span class="spacer"></span>
-        <span class="legend-hint">Click scope boxes to manage</span>
-      </div>
       <div class="tree-container" id="treeContainer">
         <div class="loading">Loading marketplaces...</div>
       </div>
