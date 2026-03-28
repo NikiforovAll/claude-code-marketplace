@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Marketplace</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
+      <span class="logo-text">Marketplace</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="topbar-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="searchInput" placeholder="Filter plugins..." autocomplete="off">
+    </div>
+    <div class="topbar-project" id="projectBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      <span id="projectPath"></span>
+    </div>
+    <button class="topbar-btn" id="addMarketplaceBtn" title="Add marketplace">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add
+    </button>
+    <button class="topbar-btn" id="refreshBtn" title="Refresh data">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      Refresh
+    </button>
+    <button class="topbar-btn" id="themeBtn" title="Toggle theme">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </div>
+
+  <div class="main-layout">
+    <div class="tree-panel">
+      <div class="scope-legend">
+        <span class="legend-label">Scopes:</span>
+        <span class="legend-item"><span class="legend-dot user"></span>User</span>
+        <span class="legend-item"><span class="legend-dot project"></span>Project</span>
+        <span class="legend-item"><span class="legend-dot local"></span>Local</span>
+        <span class="spacer"></span>
+        <span class="legend-hint">Click scope boxes to manage</span>
+      </div>
+      <div class="tree-container" id="treeContainer">
+        <div class="loading">Loading marketplaces...</div>
+      </div>
+    </div>
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-empty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        <span>Select a plugin to view details</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Add marketplace modal -->
+  <div class="modal-overlay" id="addMarketplaceModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Marketplace</h3>
+        <button class="modal-close" onclick="closeModal('addMarketplaceModal')">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label>Source</label>
+          <input type="text" id="marketplaceSource" placeholder="github:owner/repo or /path/to/directory" autocomplete="off">
+          <span class="modal-hint">GitHub repo (e.g. anthropics/skills), git URL (e.g. https://github.com/org/repo.git), or local directory path</span>
+        </div>
+        <div class="modal-actions">
+          <button class="action-btn" onclick="closeModal('addMarketplaceModal')">Cancel</button>
+          <button class="action-btn primary" id="addMarketplaceSubmit" onclick="submitAddMarketplace()">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
