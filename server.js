@@ -11,6 +11,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const PLUGINS_DIR = path.join(CLAUDE_DIR, 'plugins');
 
+let _marketplaceCache = null;
+function getCachedMarketplaces() {
+  if (!_marketplaceCache) _marketplaceCache = loadMarketplaces();
+  return _marketplaceCache;
+}
+function invalidateCache() { _marketplaceCache = null; }
+
 function getArg(name) {
   const idx = process.argv.findIndex(a => a.startsWith(`--${name}`));
   if (idx === -1) return null;
@@ -188,12 +195,28 @@ function loadMarketplaces() {
       let source = pd.source || '';
       if (typeof source === 'object') source = source.url || JSON.stringify(source);
 
-      const components = {};
       const compKeys = ['skills', 'commands', 'agents', 'mcpServers', 'hooks', 'lspServers'];
+
+      // Resolve plugin dir for filesystem-based component counts
+      let pluginDir = null;
+      for (const s of ['user', 'project', 'local']) {
+        const ip = scopeDetails[s]?.installPath;
+        const resolved = resolveInstallPath(ip);
+        if (resolved) { pluginDir = resolved; break; }
+      }
+      if (!pluginDir && installLocation) {
+        const pluginSubdir = path.join(installLocation, 'plugins', pd.name);
+        if (fs.existsSync(pluginSubdir)) pluginDir = pluginSubdir;
+        else if ((mData.plugins || []).length === 1) pluginDir = installLocation;
+      }
+
+      const fsComps = pluginDir ? countComponents(pluginDir) : null;
+      const components = {};
       for (const k of compKeys) {
-        if (pd[k]) {
-          components[k] = Array.isArray(pd[k]) ? pd[k].length : 1;
-        }
+        const fsCount = fsComps ? (Array.isArray(fsComps[k]) ? fsComps[k].length : 0) : 0;
+        const pdCount = pd[k] ? (Array.isArray(pd[k]) ? pd[k].length : 1) : 0;
+        const count = Math.max(fsCount, pdCount);
+        if (count > 0) components[k] = count;
       }
 
       marketplace.plugins.push({
@@ -201,12 +224,14 @@ function loadMarketplaces() {
         fullId,
         description: pd.description || '',
         source,
-        version: pd.version || null,
+        version: pd.version || [scopeDetails.user, scopeDetails.project, scopeDetails.local].find(d => d?.version && d.version !== 'unknown')?.version || null,
         isInstalled,
         isEnabled: isInstalled ? isEnabled : true,
         scopeDetails,
         installedScopes,
         components,
+        _pluginDir: pluginDir,
+        _fsComps: fsComps,
         metadata: Object.fromEntries(
           Object.entries(pd).filter(([k]) => !['name', 'description', 'source', 'version', ...compKeys].includes(k))
         ),
@@ -340,26 +365,14 @@ function resolveInstallPath(ip) {
   return null;
 }
 
-function resolvePluginDir(fullId, marketplaces) {
+function findPlugin(fullId, marketplaces) {
   const [pluginName, marketplaceName] = fullId.split('@');
   const marketplace = marketplaces.find(m => m.name === marketplaceName);
-  if (!marketplace) return null;
+  return marketplace?.plugins?.find(p => p.name === pluginName) || null;
+}
 
-  const plugin = marketplace.plugins.find(p => p.name === pluginName);
-  if (!plugin) return null;
-
-  for (const s of ['user', 'project', 'local']) {
-    const ip = plugin.scopeDetails[s]?.installPath;
-    const resolved = resolveInstallPath(ip);
-    if (resolved) return resolved;
-  }
-
-  if (marketplace.installLocation && plugin.source) {
-    const resolved = path.resolve(marketplace.installLocation, plugin.source);
-    if (fs.existsSync(resolved)) return resolved;
-  }
-
-  return null;
+function resolvePluginDir(fullId, marketplaces) {
+  return findPlugin(fullId, marketplaces)?._pluginDir || null;
 }
 
 // --- API Routes ---
@@ -367,7 +380,7 @@ function resolvePluginDir(fullId, marketplaces) {
 app.get('/api/marketplaces', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    res.json(loadMarketplaces());
+    res.json(getCachedMarketplaces());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -376,24 +389,19 @@ app.get('/api/marketplaces', (req, res) => {
 app.get('/api/plugins/:pluginId/components', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const pluginId = decodeURIComponent(req.params.pluginId);
-  const mktData = loadMarketplaces();
-  const pluginDir = resolvePluginDir(pluginId, mktData);
-  if (!pluginDir) return res.status(404).json({ error: 'Plugin directory not found', pluginId });
+  const mktData = getCachedMarketplaces();
+  const plugin = findPlugin(pluginId, mktData);
+  if (!plugin?._pluginDir) return res.status(404).json({ error: 'Plugin directory not found', pluginId });
 
-  // Find plugin metadata for custom component paths
-  const [pName, mName] = pluginId.split('@');
-  const mkt = mktData.find(m => m.name === mName);
-  const pluginMeta = mkt?.plugins?.find(p => p.name === pName)?.metadata || {};
-
-  const comps = countComponents(pluginDir, pluginMeta);
-  comps._pluginDir = pluginDir;
+  const comps = plugin._fsComps || countComponents(plugin._pluginDir, plugin.metadata);
+  comps._pluginDir = plugin._pluginDir;
   res.json(comps);
 });
 
 app.get('/api/plugins/:pluginId/preview/*', (req, res) => {
   const pluginId = decodeURIComponent(req.params.pluginId);
   const relPath = req.params[0];
-  const marketplaces = loadMarketplaces();
+  const marketplaces = getCachedMarketplaces();
   const pluginDir = resolvePluginDir(pluginId, marketplaces);
   if (!pluginDir) return res.status(404).json({ error: 'Plugin not found' });
 
@@ -433,6 +441,7 @@ app.put('/api/project', (req, res) => {
 });
 
 app.post('/api/refresh', (req, res) => {
+  invalidateCache();
   res.json({ ok: true });
 });
 
@@ -452,6 +461,7 @@ app.post('/api/plugins/install', async (req, res) => {
     const args = ['install', pluginId];
     if (scope) args.push('--scope', scope);
     const output = await runClaudePlugin(args);
+    invalidateCache();
     res.json({ ok: true, output });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -465,6 +475,7 @@ app.post('/api/plugins/uninstall', async (req, res) => {
     const args = ['uninstall', pluginId];
     if (scope) args.push('--scope', scope);
     const output = await runClaudePlugin(args);
+    invalidateCache();
     res.json({ ok: true, output });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -478,6 +489,7 @@ app.post('/api/plugins/enable', async (req, res) => {
     const args = ['enable', pluginId];
     if (scope) args.push('--scope', scope);
     const output = await runClaudePlugin(args);
+    invalidateCache();
     res.json({ ok: true, output });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -491,6 +503,7 @@ app.post('/api/plugins/disable', async (req, res) => {
     const args = ['disable', pluginId];
     if (scope) args.push('--scope', scope);
     const output = await runClaudePlugin(args);
+    invalidateCache();
     res.json({ ok: true, output });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -504,6 +517,7 @@ app.post('/api/plugins/update', async (req, res) => {
     const args = ['update', pluginId];
     if (scope) args.push('--scope', scope);
     const output = await runClaudePlugin(args);
+    invalidateCache();
     res.json({ ok: true, output });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -515,6 +529,7 @@ app.post('/api/marketplace/add', async (req, res) => {
   if (!source) return res.status(400).json({ error: 'source required' });
   try {
     const output = await runClaudePlugin(['marketplace', 'add', source]);
+    invalidateCache();
     res.json({ ok: true, output });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -526,6 +541,7 @@ app.post('/api/marketplace/remove', async (req, res) => {
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
     const output = await runClaudePlugin(['marketplace', 'remove', name]);
+    invalidateCache();
     res.json({ ok: true, output });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -537,6 +553,7 @@ app.post('/api/marketplace/update', async (req, res) => {
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
     const output = await runClaudePlugin(['marketplace', 'update', name]);
+    invalidateCache();
     res.json({ ok: true, output });
   } catch (err) {
     res.status(500).json({ error: err.message });
