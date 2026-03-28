@@ -290,7 +290,8 @@ function renderCompSummary(plugin) {
   if (!plugin.components) return '';
   const parts = [];
   for (const [k, v] of Object.entries(plugin.components)) {
-    if (v > 0) parts.push(`${v} ${COMP_LABELS[k]?.toLowerCase() || k}`);
+    const count = Array.isArray(v) ? v.length : v;
+    if (count > 0) parts.push(`${count} ${COMP_LABELS[k]?.toLowerCase() || k}`);
   }
   return parts.length ? `<span class="tree-meta">${parts.join(' \u00B7 ')}</span>` : '';
 }
@@ -342,21 +343,9 @@ async function showDetail(pluginId) {
     </div>
   `;
 
-  // Load actual components from filesystem
-  try {
-    let comps = componentCache[pluginId];
-    if (!comps) {
-      const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/components`);
-      if (res.ok) {
-        comps = await res.json();
-        componentCache[pluginId] = comps;
-      }
-    }
-    if (comps) {
-      const el = document.getElementById('detailComponents');
-      if (el) el.innerHTML = renderDetailComponents(pluginId, comps);
-    }
-  } catch {}
+  const comps = (await fetchComponents(pluginId)) || plugin.components || {};
+  const el = document.getElementById('detailComponents');
+  if (el) el.innerHTML = renderDetailComponents(pluginId, comps);
 }
 
 function renderScopeMatrix(plugin) {
@@ -610,12 +599,15 @@ function restoreAppState() {
 }
 
 async function fetchComponents(pluginId) {
+  if (componentCache[pluginId]) return componentCache[pluginId];
   try {
     const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/components`);
     if (res.ok) {
       componentCache[pluginId] = await res.json();
+      return componentCache[pluginId];
     }
   } catch {}
+  return null;
 }
 
 // --- Helpers ---

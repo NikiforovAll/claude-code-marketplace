@@ -213,10 +213,13 @@ function loadMarketplaces() {
       const fsComps = pluginDir ? countComponents(pluginDir) : null;
       const components = {};
       for (const k of compKeys) {
-        const fsCount = fsComps ? (Array.isArray(fsComps[k]) ? fsComps[k].length : 0) : 0;
-        const pdCount = pd[k] ? (Array.isArray(pd[k]) ? pd[k].length : 1) : 0;
-        const count = Math.max(fsCount, pdCount);
-        if (count > 0) components[k] = count;
+        if (fsComps && Array.isArray(fsComps[k]) && fsComps[k].length > 0) {
+          components[k] = fsComps[k];
+        } else if (Array.isArray(pd[k]) && pd[k].length > 0) {
+          components[k] = pd[k].map(p => typeof p === 'string' ? path.basename(p) : (p.name || String(p)));
+        } else if (pd[k]) {
+          components[k] = Array.isArray(pd[k]) ? [] : [String(pd[k])];
+        }
       }
 
       marketplace.plugins.push({
