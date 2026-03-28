@@ -6,6 +6,35 @@
   "bin": {
     "claude-code-marketplace": "server.js"
   },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "marketplace",
+    "plugins",
+    "anthropic",
+    "ai",
+    "cli",
+    "dashboard",
+    "skills",
+    "mcp",
+    "agents"
+  ],
+  "homepage": "https://nikiforovall.blog/claude-code-marketplace/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NikiforovAll/claude-code-marketplace.git"
+  },
+  "bugs": {
+    "url": "https://github.com/NikiforovAll/claude-code-marketplace/issues"
+  },
+  "author": "NikiforovAll",
+  "license": "MIT",
+  "files": [
+    "server.js",
+    "public/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --open",
