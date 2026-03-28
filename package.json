@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Web UI for browsing and managing Claude Code marketplace plugins",
   "main": "server.js",
+  "bin": {
+    "claude-code-marketplace": "server.js"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --open",

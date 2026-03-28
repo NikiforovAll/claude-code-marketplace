@@ -2,30 +2,33 @@
 
 A web-based dashboard for browsing, installing, and managing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugins across multiple marketplaces.
 
-![marketplace-screenshot](https://img.shields.io/badge/status-alpha-orange)
+<p align="center">
+  <img src="assets/main-dark.png" alt="Marketplace — dark theme" width="100%">
+</p>
 
-## Features
+<details>
+<summary>Light theme & file preview</summary>
 
-- **Multi-marketplace browser** — aggregate plugins from GitHub repos, git URLs, and local directories
-- **Scope management** — install, enable, and disable plugins per scope (user / project / local)
-- **Component inspection** — browse skills, commands, agents, MCP servers, hooks, and LSP servers inside each plugin
-- **File preview** — read plugin source files directly in the browser
-- **Marketplace actions** — add, update, and remove marketplace sources
-- **PWA support** — installable as a standalone desktop app with offline caching
-- **Dark / light theme** — styled with IBM Plex Mono, orange accent palette
+<p align="center">
+  <img src="assets/main-light.png" alt="Marketplace — light theme" width="100%">
+</p>
+
+<p align="center">
+  <img src="assets/prevew-light.png" alt="Plugin file preview" width="100%">
+</p>
+
+</details>
 
 ## Quick Start
 
 ```bash
-npm install
-npm start
-# opens http://localhost:3457
+npx claude-code-marketplace --open
 ```
 
-Or with auto-open:
+Or with a custom port:
 
 ```bash
-npm run dev
+npx claude-code-marketplace --port 8080
 ```
 
 ### Options
@@ -35,6 +38,17 @@ npm run dev
 --project <path>  Project directory for project-scoped plugins
 --open            Open browser on start
 ```
+
+## Features
+
+- **Multi-marketplace browser** — aggregate plugins from GitHub repos, git URLs, and local directories
+- **Scope management** — install, enable, and disable plugins per scope (user / project / local)
+- **Component inspection** — browse skills, commands, agents, MCP servers, hooks, and LSP servers inside each plugin
+- **File preview** — read plugin source files directly in the browser with syntax highlighting
+- **Marketplace actions** — add, update, and remove marketplace sources
+- **PWA support** — installable as a standalone desktop app with offline caching
+- **Dark / light theme** — styled with IBM Plex Mono, orange accent palette
+- **Keyboard-first** — vim-style navigation, press `?` for shortcuts
 
 ## How It Works
 
@@ -53,6 +67,13 @@ All plugin management operations (install, uninstall, enable, disable) delegate 
 - **Linter** — Biome with husky pre-commit hook
 
 ## Development
+
+```bash
+git clone https://github.com/NikiforovAll/claude-code-marketplace.git
+cd claude-code-marketplace
+npm install
+npm run dev
+```
 
 ```bash
 npm run lint        # check with biome
