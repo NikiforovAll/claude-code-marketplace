@@ -2,6 +2,8 @@
 
 A web-based dashboard for browsing, installing, and managing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugins across multiple marketplaces.
 
+[![npm](https://img.shields.io/npm/v/claude-code-marketplace)](https://www.npmjs.com/package/claude-code-marketplace)
+
 <p align="center">
   <img src="assets/main-dark.png" alt="Marketplace — dark theme" width="100%">
 </p>
