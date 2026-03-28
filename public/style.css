@@ -366,7 +366,8 @@ body {
   flex-shrink: 0;
 }
 .tree-chevron.expanded { transform: rotate(90deg); }
-.tree-icon { font-size: 13px; flex-shrink: 0; width: 18px; text-align: center; }
+.tree-icon { flex-shrink: 0; width: 18px; display: flex; align-items: center; justify-content: center; opacity: 0.45; }
+.tree-icon svg { width: 14px; height: 14px; }
 .tree-label {
   flex-shrink: 0;
   white-space: nowrap;
@@ -500,7 +501,8 @@ body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba
   min-height: 26px;
 }
 .comp-row:hover { background: var(--bg-hover); cursor: pointer; }
-.comp-icon { font-size: 12px; width: 16px; text-align: center; flex-shrink: 0; }
+.comp-icon { width: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: 0.5; }
+.comp-icon svg { width: 12px; height: 12px; }
 .comp-count {
   margin-left: auto;
   font-size: 10px;
@@ -551,7 +553,11 @@ body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.detail-header h3 svg { width: 16px; height: 16px; opacity: 0.5; }
 .detail-close {
   background: transparent;
   border: 1px solid transparent;
@@ -691,7 +697,8 @@ body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba
   transition: background 0.12s;
 }
 .detail-comp-item:hover { background: var(--bg-hover); color: var(--text-secondary); }
-.detail-comp-item .icon { font-size: 12px; }
+.detail-comp-item .icon { width: 14px; display: flex; align-items: center; opacity: 0.5; }
+.detail-comp-item .icon svg { width: 12px; height: 12px; }
 
 .comp-type-label {
   margin-left: auto;
@@ -729,7 +736,8 @@ body.light .scope-toggle.local { border-color: rgba(176,125,10,0.5); color: rgba
   transition: background 0.1s ease;
 }
 .file-tree-item:hover { background: var(--bg-hover); color: var(--text-secondary); }
-.file-tree-item .icon { width: 16px; text-align: center; font-size: 12px; flex-shrink: 0; }
+.file-tree-item .icon { width: 16px; display: flex; align-items: center; flex-shrink: 0; opacity: 0.5; }
+.file-tree-item .icon svg { width: 12px; height: 12px; }
 
 /* === TOAST === */
 

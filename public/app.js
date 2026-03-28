@@ -6,9 +6,22 @@ const expandedNodes = new Set();
 const componentCache = {};
 let detailHistory = [];
 
+const SVG = (d, w=14) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONS = {
+  marketplace: SVG('<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>'),
+  plugin:      SVG('<path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>'),
+  skills:      SVG('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+  commands:    SVG('<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>'),
+  agents:      SVG('<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>'),
+  mcpServers:  SVG('<path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>'),
+  hooks:       SVG('<polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/>'),
+  lspServers:  SVG('<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>'),
+  folder:      SVG('<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'),
+  file:        SVG('<path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/>'),
+};
 const COMP_ICONS = {
-  skills: '\u26A1', commands: '\u25B6', agents: '\uD83E\uDD16',
-  mcpServers: '\uD83D\uDD0C', hooks: '\u2693', lspServers: '\uD83D\uDD27',
+  skills: ICONS.skills, commands: ICONS.commands, agents: ICONS.agents,
+  mcpServers: ICONS.mcpServers, hooks: ICONS.hooks, lspServers: ICONS.lspServers,
 };
 const COMP_LABELS = {
   skills: 'Skills', commands: 'Commands', agents: 'Agents',
@@ -187,7 +200,7 @@ function renderTree() {
 
     html += `<div class="tree-row marketplace-row" onclick="toggleChildren('m_${mid}')">
       <span class="tree-chevron${mExpanded ? ' expanded' : ''}" id="chev_m_${mid}">\u25B6</span>
-      <span class="tree-icon">\uD83C\uDFEB</span>
+      <span class="tree-icon">${ICONS.marketplace}</span>
       <span class="tree-label"><span class="mkt-name">${esc(m.name)}</span></span>
       ${srcBadge}
       ${pluginCount}
@@ -220,7 +233,7 @@ function renderPluginRow(p, m) {
 
   let html = `<div class="tree-row${selected}" onclick="showDetail('${esc(p.fullId)}')">
     <span class="tree-indent" style="width:40px"></span>
-    <span class="tree-icon">\uD83D\uDCE6</span>
+    <span class="tree-icon">${ICONS.plugin}</span>
     <span class="tree-label">${esc(p.name)} ${ver}</span>
     ${desc}
     ${scopes}
@@ -285,7 +298,7 @@ async function showDetail(pluginId, focusComponent) {
 
   panel.innerHTML = `
     <div class="detail-header">
-      <h3>\uD83D\uDCE6 ${esc(plugin.name)}</h3>
+      <h3>${ICONS.plugin} ${esc(plugin.name)}</h3>
       <button class="detail-close" onclick="closeDetail()">\u2715</button>
     </div>
     <div class="detail-body">
@@ -373,7 +386,7 @@ function renderDetailComponents(pluginId, comps) {
     const count = names.length || items;
     let html = `<div class="detail-comp-group">
       <div class="detail-comp-header">
-        <span style="font-size:14px">${COMP_ICONS[type] || ''}</span>
+        <span class="comp-icon">${COMP_ICONS[type] || ''}</span>
         ${COMP_LABELS[type] || type}
         <span class="count">${count}</span>
       </div>`;
@@ -384,7 +397,7 @@ function renderDetailComponents(pluginId, comps) {
       for (const name of names) {
         const clickPath = dir ? `${dir}/${name}` : name;
         html += `<div class="detail-comp-item" onclick="loadFilePreview('${esc(pluginId)}', '${esc(clickPath)}')">
-          <span class="icon">${type === 'skills' ? '\uD83D\uDCC1' : '\uD83D\uDCC4'}</span>
+          <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
           ${esc(name)}
         </div>`;
       }
@@ -410,7 +423,7 @@ async function previewComponent(pluginId, type, names) {
     let html = '';
     for (const name of names) {
       html += `<div class="file-tree-item" onclick="loadFilePreview('${esc(pluginId)}', '${dir}/${name}')">
-        <span class="icon">${type === 'skills' ? '\uD83D\uDCC1' : '\uD83D\uDCC4'}</span>
+        <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
         ${esc(name)}
       </div>`;
     }
@@ -433,7 +446,7 @@ async function loadFilePreview(pluginId, filePath) {
     if (data.type === 'directory') {
       let html = `<div style="margin-bottom:8px;font-size:11px;color:var(--text-dim)">${esc(filePath)}/</div>`;
       for (const entry of data.entries) {
-        const icon = entry.isDirectory ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
+        const icon = entry.isDirectory ? ICONS.folder : ICONS.file;
         const subPath = filePath + '/' + entry.name;
         html += `<div class="file-tree-item" onclick="loadFilePreview('${esc(pluginId)}', '${esc(subPath)}')">
           <span class="icon">${icon}</span>
@@ -467,7 +480,7 @@ function showMarketplaceDetail(name) {
 
   panel.innerHTML = `
     <div class="detail-header">
-      <h3>\uD83C\uDFEB ${esc(m.name)}</h3>
+      <h3>${ICONS.marketplace} ${esc(m.name)}</h3>
       <button class="detail-close" onclick="closeDetail()">\u2715</button>
     </div>
     <div class="detail-body">
