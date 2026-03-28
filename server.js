@@ -152,6 +152,7 @@ function loadMarketplaces() {
       },
       installLocation,
       lastUpdated: entryData.lastUpdated || null,
+      version: null,
       plugins: [],
       error: null,
     };
@@ -163,6 +164,9 @@ function loadMarketplaces() {
       marketplaces.push(marketplace);
       continue;
     }
+    marketplace.version = mData.version || null;
+    marketplace.owner = mData.owner || null;
+    marketplace.description = mData.description || null;
 
     for (const pd of (mData.plugins || [])) {
       if (!pd.name) continue;
@@ -222,12 +226,26 @@ function loadMarketplaces() {
         }
       }
 
+      const installedVersion = [scopeDetails.user, scopeDetails.project, scopeDetails.local]
+        .find(d => d?.version && d.version !== 'unknown')?.version || null;
+
+      let availableVersion = pd.version || null;
+      if (!availableVersion && installLocation) {
+        const sourceDir = pd.source || `plugins/${pd.name}`;
+        const pluginJson = path.join(installLocation, typeof sourceDir === 'string' ? sourceDir : pd.name, '.claude-plugin', 'plugin.json');
+        const pjData = readJsonSafe(pluginJson);
+        if (pjData?.version) availableVersion = pjData.version;
+      }
+      const hasUpdate = isInstalled && semverNewer(availableVersion, installedVersion);
+
       marketplace.plugins.push({
         name: pd.name,
         fullId,
         description: pd.description || '',
         source,
-        version: pd.version || [scopeDetails.user, scopeDetails.project, scopeDetails.local].find(d => d?.version && d.version !== 'unknown')?.version || null,
+        version: installedVersion || availableVersion,
+        availableVersion,
+        hasUpdate,
         isInstalled,
         isEnabled: isInstalled ? isEnabled : true,
         scopeDetails,
@@ -404,6 +422,26 @@ function scanCustomizations(basePath, scope) {
   };
 }
 
+function parseVer(v) {
+  const parts = String(v).split('.').map(Number);
+  return parts.some(isNaN) ? null : parts;
+}
+
+function semverCompare(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] || 0) - (b[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function semverNewer(available, installed) {
+  if (!available || !installed) return false;
+  const a = parseVer(available), b = parseVer(installed);
+  if (!a || !b) return false;
+  return semverCompare(a, b) > 0;
+}
+
 function findLatestVersionDir(parentDir) {
   try {
     const subdirs = fs.readdirSync(parentDir, { withFileTypes: true })
@@ -411,13 +449,9 @@ function findLatestVersionDir(parentDir) {
       .map(d => d.name);
     if (!subdirs.length) return null;
     subdirs.sort((a, b) => {
-      const pa = a.split('.').map(Number);
-      const pb = b.split('.').map(Number);
-      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-        const va = pa[i] || 0, vb = pb[i] || 0;
-        if (va !== vb) return vb - va;
-      }
-      return 0;
+      const pa = parseVer(a), pb = parseVer(b);
+      if (!pa || !pb) return 0;
+      return semverCompare(pb, pa);
     });
     return path.join(parentDir, subdirs[0]);
   } catch { return null; }

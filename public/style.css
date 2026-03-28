@@ -550,6 +550,40 @@ body.light .scope-toggle.local {
   background: var(--plan-dim);
   color: var(--plan);
 }
+
+/* === UPDATE INDICATORS === */
+
+.update-indicator {
+  color: var(--success);
+  font-weight: 700;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.update-badge {
+  font-size: 10px;
+  color: var(--success);
+  background: var(--success-dim);
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: var(--success-dim);
+  border: 1px solid rgba(62, 207, 142, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--success);
+}
+
 .badge-count {
   font-size: 10px;
   color: var(--text-muted);

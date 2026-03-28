@@ -52,6 +52,15 @@ const COMP_LABELS = {
   lspServers: 'LSP Servers',
 };
 
+function updateArrow(p) {
+  if (!p.hasUpdate) return '';
+  const title =
+    p.version && p.availableVersion
+      ? `Update available: v${esc(p.version)} \u2192 v${esc(p.availableVersion)}`
+      : 'Update available';
+  return `<span class="update-indicator" title="${title}">\u2191</span>`;
+}
+
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
   restoreAppState();
@@ -125,6 +134,9 @@ async function loadData() {
     componentCache = {};
     const res = await fetch('/api/marketplaces');
     marketplaces = await res.json();
+    for (const m of marketplaces) {
+      m.updateCount = m.plugins.filter((p) => p.hasUpdate).length;
+    }
 
     renderTree();
     if (selectedPluginId) showDetail(selectedPluginId);
@@ -209,6 +221,10 @@ function renderTree() {
     if (plugins.length === 0 && (searchFilter || scopeFilter !== 'all')) continue;
 
     const srcBadge = m.isVirtual ? '' : sourceBadge(m.source.type);
+    const updateBadge =
+      m.updateCount > 0
+        ? `<span class="update-badge">${m.updateCount} update${m.updateCount !== 1 ? 's' : ''}</span>`
+        : '';
     const pluginCount = m.isVirtual
       ? ''
       : `<span class="badge-count">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''}</span>`;
@@ -222,9 +238,10 @@ function renderTree() {
     html += `<div class="tree-row marketplace-row${m.isVirtual ? ' virtual' : ''}" data-row-type="marketplace" data-row-id="m_${mid}" onclick="toggleChildren('m_${mid}')">
       <span class="tree-chevron${mExpanded ? ' expanded' : ''}" id="chev_m_${mid}">\u25B6</span>
       <span class="tree-icon">${mIcon}</span>
-      <span class="tree-label"><span class="mkt-name">${esc(m.name)}</span></span>
+      <span class="tree-label"><span class="mkt-name">${esc(m.name)}</span> ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</span>
       ${srcBadge}
       ${pluginCount}
+      ${updateBadge}
       ${kebabBtn}
     </div>`;
 
@@ -256,6 +273,7 @@ function renderPluginRow(p) {
   const scopes = p.isVirtual ? '' : renderScopeToggles(p);
   const summary = renderCompSummary(p);
   const ver = p.version ? `<span class="version">v${esc(p.version)}</span>` : '';
+  const updateIndicator = updateArrow(p);
   const virtualCls = p.isVirtual ? ' virtual' : '';
   const icon = p.isVirtual ? ICONS.gear : ICONS.plugin;
 
@@ -264,7 +282,7 @@ function renderPluginRow(p) {
   const html = `<div class="tree-row${selected}${virtualCls}" data-row-type="plugin" data-row-id="${esc(p.fullId)}" onclick="showDetail('${esc(p.fullId)}')">
     <span class="tree-indent" style="width:40px"></span>
     <span class="tree-icon">${icon}</span>
-    <span class="tree-label">${esc(p.name)} ${ver}</span>
+    <span class="tree-label">${esc(p.name)} ${ver} ${updateIndicator}</span>
     ${desc}
     ${scopes}
     ${summary}
@@ -326,6 +344,13 @@ async function showDetail(pluginId) {
   const componentsHtml = '<div style="color:var(--text-dim);font-size:12px">Loading components...</div>';
   const headerIcon = isVirtual ? ICONS.gear : ICONS.plugin;
 
+  const updateBanner = plugin.hasUpdate
+    ? `<div class="update-banner">
+        <span>Update available: <strong>v${esc(plugin.version)}</strong> \u2192 <strong>v${esc(plugin.availableVersion)}</strong></span>
+        <button class="action-btn primary" onclick="runAction('update', '${esc(plugin.fullId)}')">Update Plugin</button>
+      </div>`
+    : '';
+
   const scopeSection = isVirtual
     ? `<div class="detail-section">
         <span class="badge badge-virtual">Custom</span>
@@ -351,6 +376,7 @@ async function showDetail(pluginId) {
       <button class="detail-close" onclick="closeDetail()">\u2715</button>
     </div>
     <div class="detail-body">
+      ${updateBanner}
       <div class="detail-section">
         <p class="detail-desc">${esc(plugin.description || 'No description')}</p>
         ${metaRow}
@@ -488,7 +514,7 @@ function showMarketplaceDetail(name) {
 
   panel.innerHTML = `
     <div class="detail-header">
-      <h3>${ICONS.marketplace} ${esc(m.name)}</h3>
+      <h3>${ICONS.marketplace} ${esc(m.name)} ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</h3>
       <button class="detail-close" onclick="closeDetail()">\u2715</button>
     </div>
     <div class="detail-body">
@@ -496,6 +522,9 @@ function showMarketplaceDetail(name) {
         <div class="detail-meta-grid">
           <span class="meta-label">Source</span>
           <span class="meta-value">${sourceBadge(srcType)} ${esc(srcDetail)}</span>
+          ${m.version ? `<span class="meta-label">Version</span><span class="meta-value">v${esc(m.version)}</span>` : ''}
+          ${m.owner?.name ? `<span class="meta-label">Owner</span><span class="meta-value">${esc(m.owner.name)}${m.owner.email ? ` &lt;${esc(m.owner.email)}&gt;` : ''}${m.owner.url ? ` \u00B7 ${esc(m.owner.url)}` : ''}</span>` : ''}
+          ${m.description ? `<span class="meta-label">Description</span><span class="meta-value">${esc(m.description)}</span>` : ''}
           <span class="meta-label">Location</span>
           <span class="meta-value" style="word-break:break-all;font-size:11px">${esc(m.installLocation || '?')}</span>
           <span class="meta-label">Last updated</span>
@@ -520,7 +549,8 @@ function showMarketplaceDetail(name) {
                 ? '<span style="color:var(--success)">enabled</span>'
                 : '<span style="color:var(--warning)">disabled</span>'
               : '<span style="color:var(--text-muted)">not installed</span>';
-            return `<div class="mkt-plugin-item" onclick="if(detailHistory.length<20)detailHistory.push({type:'marketplace',name:'${esc(m.name)}'}); showDetail('${esc(p.fullId)}')">${esc(p.name)} ${status}</div>`;
+            const updateTag = updateArrow(p);
+            return `<div class="mkt-plugin-item" onclick="if(detailHistory.length<20)detailHistory.push({type:'marketplace',name:'${esc(m.name)}'}); showDetail('${esc(p.fullId)}')">${esc(p.name)} ${status}${updateTag}</div>`;
           })
           .join('')}
       </div>
