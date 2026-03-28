@@ -79,7 +79,7 @@ body {
   background: var(--bg-deep);
   color: var(--text-primary);
   line-height: 1.5;
-  height: 100vh;
+  height: calc(100vh / 1.2);
   display: flex;
   zoom: 1.2;
   flex-direction: column;
@@ -272,6 +272,7 @@ body {
 .main-layout {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -287,6 +288,7 @@ body {
 
 .tree-container {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
