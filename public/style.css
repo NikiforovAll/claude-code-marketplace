@@ -720,6 +720,12 @@ body.light .scope-toggle.local {
   font-size: 11px;
   font-weight: 400;
 }
+.detail-header-actions,
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .detail-close {
   background: transparent;
   border: 1px solid transparent;
@@ -997,6 +1003,20 @@ body.light .scope-toggle.local {
   font-size: 13px;
   font-weight: 600;
 }
+.modal-action-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+.modal-action-btn:hover {
+  color: var(--accent);
+  background: var(--hover);
+}
 .modal-close {
   background: none;
   border: none;
@@ -1004,6 +1024,10 @@ body.light .scope-toggle.local {
   cursor: pointer;
   font-size: 16px;
   padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 .modal-body {
   padding: 16px;

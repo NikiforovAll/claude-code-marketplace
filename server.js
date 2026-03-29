@@ -202,6 +202,21 @@ function loadMarketplaces() {
 
       const compKeys = ['skills', 'commands', 'agents', 'mcpServers', 'hooks', 'lspServers'];
 
+      // Resolve origin dir from marketplace source
+      let originDir = null;
+      if (installLocation) {
+        const rawSource = pd.source;
+        if (typeof rawSource === 'string' && rawSource) {
+          const srcDir = path.resolve(installLocation, rawSource);
+          if (fs.existsSync(srcDir)) originDir = srcDir;
+        }
+        if (!originDir) {
+          const pluginSubdir = path.join(installLocation, 'plugins', pd.name);
+          if (fs.existsSync(pluginSubdir)) originDir = pluginSubdir;
+          else if ((mData.plugins || []).length === 1) originDir = installLocation;
+        }
+      }
+
       // Resolve plugin dir for filesystem-based component counts
       let pluginDir = null;
       for (const s of ['user', 'project', 'local']) {
@@ -209,11 +224,7 @@ function loadMarketplaces() {
         const resolved = resolveInstallPath(ip);
         if (resolved) { pluginDir = resolved; break; }
       }
-      if (!pluginDir && installLocation) {
-        const pluginSubdir = path.join(installLocation, 'plugins', pd.name);
-        if (fs.existsSync(pluginSubdir)) pluginDir = pluginSubdir;
-        else if ((mData.plugins || []).length === 1) pluginDir = installLocation;
-      }
+      if (!pluginDir) pluginDir = originDir;
 
       const fsComps = pluginDir ? countComponents(pluginDir) : null;
       const components = {};
@@ -253,6 +264,7 @@ function loadMarketplaces() {
         installedScopes,
         components,
         _pluginDir: pluginDir,
+        _originDir: originDir,
         _fsComps: fsComps,
         metadata: Object.fromEntries(
           Object.entries(pd).filter(([k]) => !['name', 'description', 'source', 'version', ...compKeys].includes(k))
@@ -560,6 +572,54 @@ app.get('/api/plugins/:pluginId/preview/*', (req, res) => {
   } catch {
     res.status(404).json({ error: 'Path not found' });
   }
+});
+
+function openVSCode(args, res) {
+  execFile('code', args, { shell: true }, (err) => {
+    if (err) return res.status(500).json({ error: 'Failed to open editor' });
+    res.json({ ok: true });
+  });
+}
+
+app.post('/api/open-in-editor', (req, res) => {
+  const { pluginId, relativePath } = req.body;
+  if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
+
+  const marketplaces = getCachedMarketplaces();
+  const pluginDir = resolvePluginDir(pluginId, marketplaces);
+  if (!pluginDir) return res.status(404).json({ error: 'Plugin not found' });
+
+  const args = ['-n', pluginDir];
+
+  const pluginJson = path.join(pluginDir, '.claude-plugin', 'plugin.json');
+  if (fs.existsSync(pluginJson)) args.push(pluginJson);
+
+  if (relativePath) {
+    const fullPath = path.resolve(pluginDir, relativePath);
+    if (fullPath.startsWith(path.resolve(pluginDir))) {
+      args.push(fullPath);
+    }
+  }
+
+  openVSCode(args, res);
+});
+
+app.post('/api/open-folder-in-editor', (req, res) => {
+  const { pluginId, marketplaceName } = req.body;
+  const marketplaces = getCachedMarketplaces();
+  let folder;
+
+  if (pluginId) {
+    const plugin = findPlugin(pluginId, marketplaces);
+    folder = plugin?._originDir || plugin?._pluginDir || null;
+  } else if (marketplaceName) {
+    const m = marketplaces.find(m => m.name === marketplaceName);
+    folder = m?.installLocation || null;
+  }
+
+  if (!folder) return res.status(404).json({ error: 'Directory not found' });
+
+  openVSCode(['-n', folder], res);
 });
 
 app.get('/api/project', (req, res) => {

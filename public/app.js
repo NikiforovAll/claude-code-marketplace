@@ -43,6 +43,8 @@ const ICONS = {
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>',
 };
 ICONS.settings = ICONS.gear;
+ICONS.openEditor =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.583 2.207a1.1 1.1 0 0 1 1.541.033l2.636 2.636a1.1 1.1 0 0 1 .033 1.541L10.68 17.53a1.1 1.1 0 0 1-.345.247l-4.56 1.903a.55.55 0 0 1-.725-.725l1.903-4.56a1.1 1.1 0 0 1 .247-.345zm.902 1.87-8.794 8.793-.946 2.268 2.268-.946 8.794-8.793z"/></svg>';
 const COMP_HAS_DIR = new Set(['skills', 'commands', 'agents']);
 const COMP_LABELS = {
   skills: 'Skills',
@@ -65,6 +67,7 @@ function updateArrow(p) {
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('contentOpenEditor').innerHTML = ICONS.openEditor;
   restoreAppState();
   loadProject();
   loadData();
@@ -388,7 +391,10 @@ async function showDetail(pluginId) {
   panel.innerHTML = `
     <div class="detail-header">
       <h3>${headerIcon} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
-      <button class="detail-close" onclick="closeDetail()">\u2715</button>
+      <div class="detail-header-actions">
+        ${plugin._pluginDir ? `<button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({pluginId:'${esc(plugin.fullId)}'})">${ICONS.openEditor}</button>` : ''}
+        <button class="detail-close" onclick="closeDetail()">\u2715</button>
+      </div>
     </div>
     <div class="detail-body">
       ${updateBanner}
@@ -503,6 +509,7 @@ const EXT_TO_LANG = {
 
 const PREFERRED_FILE = 'SKILL.MD';
 let _contentCodeEl = null;
+let _contentPluginId = null;
 
 function highlightSource(text, fileName) {
   const ext = (fileName || '').split('.').pop().toLowerCase();
@@ -530,7 +537,31 @@ function getContentCodeEl() {
   return _contentCodeEl;
 }
 
+async function openInEditor() {
+  if (!_contentPluginId) return;
+  const relativePath = document.getElementById('contentViewerPath').textContent || '';
+  try {
+    await fetch('/api/open-in-editor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pluginId: _contentPluginId, relativePath }),
+    });
+  } catch {}
+}
+
+async function openFolderInEditor({ pluginId, marketplaceName } = {}) {
+  if (!pluginId && !marketplaceName) return;
+  try {
+    await fetch('/api/open-folder-in-editor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pluginId, marketplaceName }),
+    });
+  } catch {}
+}
+
 async function openContentModal(pluginId, initialPath, componentType) {
+  _contentPluginId = pluginId;
   const plugin = findPlugin(pluginId);
   const label = COMP_LABELS[componentType] || componentType;
   document.getElementById('contentModalTitle').textContent = `${plugin?.name || pluginId} \u2014 ${label}`;
@@ -649,7 +680,10 @@ function showMarketplaceDetail(name) {
   panel.innerHTML = `
     <div class="detail-header">
       <h3>${ICONS.marketplace} ${esc(m.name)} ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</h3>
-      <button class="detail-close" onclick="closeDetail()">\u2715</button>
+      <div class="detail-header-actions">
+        ${m.installLocation ? `<button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({marketplaceName:'${esc(m.name)}'})">${ICONS.openEditor}</button>` : ''}
+        <button class="detail-close" onclick="closeDetail()">\u2715</button>
+      </div>
     </div>
     <div class="detail-body">
       <div class="detail-section">

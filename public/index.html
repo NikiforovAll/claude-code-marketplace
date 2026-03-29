@@ -135,7 +135,10 @@
     <div class="modal content-modal" onclick="event.stopPropagation()">
       <div class="modal-header">
         <h3 id="contentModalTitle">File Preview</h3>
-        <button class="modal-close" onclick="closeModal('contentModal')">&#10005;</button>
+        <div class="modal-header-actions">
+          <button class="modal-action-btn" id="contentOpenEditor" title="Open in VS Code" onclick="openInEditor()"></button>
+          <button class="modal-close" onclick="closeModal('contentModal')">&#10005;</button>
+        </div>
       </div>
       <div class="content-modal-body">
         <div class="content-tree" id="contentTree"></div>
