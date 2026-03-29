@@ -95,6 +95,28 @@
     </div>
   </div>
 
+  <!-- Project picker modal -->
+  <div class="modal-overlay" id="projectPickerModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Switch Project</h3>
+        <button class="modal-close" onclick="closeModal('projectPickerModal')">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label>Project directory</label>
+          <input type="text" id="projectPathInput" placeholder="/path/to/project" autocomplete="off">
+          <span class="modal-hint">Full path to the project directory</span>
+        </div>
+        <div id="recentProjectsList"></div>
+        <div class="modal-actions">
+          <button class="action-btn" onclick="closeModal('projectPickerModal')">Cancel</button>
+          <button class="action-btn primary" id="projectPickerSubmit" onclick="submitProjectPicker()">Switch</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Help modal -->
   <div class="modal-overlay" id="helpModal">
     <div class="modal help-modal" onclick="event.stopPropagation()">

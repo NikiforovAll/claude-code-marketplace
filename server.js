@@ -629,9 +629,11 @@ app.get('/api/project', (req, res) => {
 app.put('/api/project', (req, res) => {
   const newPath = req.body.path;
   if (!newPath) return res.status(400).json({ error: 'path required' });
-  const resolved = newPath.startsWith('~') ? newPath.replace('~', os.homedir()) : newPath;
+  const expanded = newPath.startsWith('~') ? newPath.replace('~', os.homedir()) : newPath;
+  const resolved = path.resolve(expanded);
   if (!fs.existsSync(resolved)) return res.status(400).json({ error: 'Directory does not exist' });
   projectPath = resolved;
+  invalidateCache();
   res.json({ path: projectPath });
 });
 

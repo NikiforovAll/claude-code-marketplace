@@ -91,17 +91,20 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('addMarketplaceBtn').addEventListener('click', openAddMarketplace);
   document.getElementById('helpBtn').addEventListener('click', showHelpModal);
 
-  // Enter key in modal
-  document.getElementById('marketplaceSource').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      submitAddMarketplace();
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closeModal('addMarketplaceModal');
-    }
-  });
+  function bindModalKeys(inputId, modalId, onSubmit) {
+    document.getElementById(inputId).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onSubmit();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModal(modalId);
+      }
+    });
+  }
+  bindModalKeys('marketplaceSource', 'addMarketplaceModal', submitAddMarketplace);
+  bindModalKeys('projectPathInput', 'projectPickerModal', submitProjectPicker);
 
   const savedTheme = localStorage.getItem('theme');
   if (savedTheme === 'dark') {
@@ -141,6 +144,7 @@ async function loadProject() {
     const data = await res.json();
     document.getElementById('projectPath').textContent = shortenPath(data.path);
     document.getElementById('projectBtn').title = data.path;
+    saveRecentProject(data.path);
   } catch {}
 }
 
@@ -181,25 +185,68 @@ async function refresh() {
   toast('Data refreshed', 'success');
 }
 
-async function changeProject() {
-  // Try native directory picker API first, fall back to prompt
-  let dirPath = null;
-  if (window.showDirectoryPicker) {
-    try {
-      const handle = await window.showDirectoryPicker({ mode: 'read' });
-      dirPath = handle.name;
-      // showDirectoryPicker doesn't give full path — fall back to prompt with the name as hint
-      dirPath = prompt('Confirm project directory (browser cannot read full path):', dirPath);
-    } catch (e) {
-      if (e.name === 'AbortError') return;
-    }
+function getRecentProjects() {
+  try {
+    return JSON.parse(localStorage.getItem('recentProjects') || '[]');
+  } catch {
+    return [];
   }
-  if (!dirPath) {
-    const current = document.getElementById('projectBtn').title;
-    dirPath = prompt('Project directory:', current);
-  }
-  if (!dirPath) return;
+}
 
+function saveRecentProject(projectPath) {
+  const recent = getRecentProjects().filter((p) => p !== projectPath);
+  recent.unshift(projectPath);
+  localStorage.setItem('recentProjects', JSON.stringify(recent.slice(0, 10)));
+}
+
+function removeRecentProject(projectPath, e) {
+  e.stopPropagation();
+  const recent = getRecentProjects().filter((p) => p !== projectPath);
+  localStorage.setItem('recentProjects', JSON.stringify(recent));
+  renderRecentProjects();
+}
+
+function renderRecentProjects() {
+  const container = document.getElementById('recentProjectsList');
+  const current = document.getElementById('projectBtn').title;
+  const recent = getRecentProjects().filter((p) => p !== current);
+  if (!recent.length) {
+    container.innerHTML = '';
+    return;
+  }
+  const escAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const escJs = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  container.innerHTML =
+    '<div class="recent-projects-label">Recent</div>' +
+    recent
+      .map(
+        (p) =>
+          `<div class="recent-project-item" onclick="selectRecentProject('${escJs(p)}')">` +
+          `<span>${escAttr(p)}</span>` +
+          `<button class="recent-project-remove" onclick="removeRecentProject('${escJs(p)}', event)" title="Remove">&#10005;</button>` +
+          `</div>`,
+      )
+      .join('');
+}
+
+function selectRecentProject(projectPath) {
+  document.getElementById('projectPathInput').value = projectPath;
+}
+
+function changeProject() {
+  const current = document.getElementById('projectBtn').title;
+  document.getElementById('projectPathInput').value = current;
+  renderRecentProjects();
+  document.getElementById('projectPickerModal').classList.add('open');
+  setTimeout(() => document.getElementById('projectPathInput').focus(), 100);
+}
+
+async function submitProjectPicker() {
+  const dirPath = document.getElementById('projectPathInput').value.trim();
+  if (!dirPath) return;
+  const btn = document.getElementById('projectPickerSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Switching...';
   try {
     const res = await fetch('/api/project', {
       method: 'PUT',
@@ -211,11 +258,15 @@ async function changeProject() {
       toast(err.error, 'error');
       return;
     }
+    closeModal('projectPickerModal');
     await loadProject();
     await loadData();
     toast('Project switched', 'success');
   } catch (err) {
     toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Switch';
   }
 }
 

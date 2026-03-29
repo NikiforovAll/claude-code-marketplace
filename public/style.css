@@ -1096,6 +1096,52 @@ body.light .scope-toggle.local {
   margin-top: 16px;
 }
 
+/* === RECENT PROJECTS === */
+
+.recent-projects-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recent-project-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.recent-project-item:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.recent-project-remove {
+  margin-left: auto;
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.recent-project-item:hover .recent-project-remove {
+  opacity: 1;
+}
+
+.recent-project-remove:hover {
+  color: var(--danger);
+}
+
 /* === HELP MODAL === */
 
 .help-modal {
