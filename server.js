@@ -645,7 +645,7 @@ app.post('/api/refresh', (req, res) => {
 
 function runClaudePlugin(args) {
   return new Promise((resolve, reject) => {
-    execFile('claude', ['plugin', ...args], { timeout: 30000, shell: true }, (err, stdout, stderr) => {
+    execFile('claude', ['plugin', ...args], { timeout: 30000, shell: true, cwd: projectPath || undefined }, (err, stdout, stderr) => {
       if (err) return reject(new Error(stderr || err.message));
       resolve(stdout.trim());
     });
