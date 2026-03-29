@@ -552,10 +552,11 @@ app.get('/api/plugins/:pluginId/preview/*', (req, res) => {
   const pluginDir = resolvePluginDir(pluginId, marketplaces);
   if (!pluginDir) return res.status(404).json({ error: 'Plugin not found' });
 
-  const fullPath = path.resolve(pluginDir, relPath);
+  let fullPath = path.resolve(pluginDir, relPath);
   if (!fullPath.startsWith(path.resolve(pluginDir))) {
     return res.status(403).json({ error: 'Access denied' });
   }
+  if (!fs.existsSync(fullPath) && fs.existsSync(fullPath + '.md')) fullPath += '.md';
 
   try {
     const stat = fs.statSync(fullPath);
