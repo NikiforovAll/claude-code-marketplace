@@ -42,6 +42,9 @@ const ICONS = {
   kebab:
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>',
 };
+ICONS.readme = SVG(
+  '<path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>',
+);
 ICONS.settings = ICONS.gear;
 ICONS.openEditor =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.583 2.207a1.1 1.1 0 0 1 1.541.033l2.636 2.636a1.1 1.1 0 0 1 .033 1.541L10.68 17.53a1.1 1.1 0 0 1-.345.247l-4.56 1.903a.55.55 0 0 1-.725-.725l1.903-4.56a1.1 1.1 0 0 1 .247-.345zm.902 1.87-8.794 8.793-.946 2.268 2.268-.946 8.794-8.793z"/></svg>';
@@ -54,6 +57,7 @@ const COMP_LABELS = {
   hooks: 'Hooks',
   lspServers: 'LSP Servers',
   settings: 'Settings',
+  readme: 'README',
 };
 
 function updateArrow(p) {
@@ -505,41 +509,52 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
   const entries = Object.entries(comps).filter(
     ([k, v]) => !k.startsWith('_') && (Array.isArray(v) ? v.length > 0 : v > 0),
   );
-  if (!entries.length) return '<div style="color:var(--text-dim);font-size:12px">No components found</div>';
+  if (!entries.length && !comps._readmePath)
+    return '<div style="color:var(--text-dim);font-size:12px">No components found</div>';
 
-  return entries
-    .map(([type, items]) => {
-      const names = Array.isArray(items) ? items : [];
-      const count = names.length || items;
-      let html = `<div class="detail-comp-group">
+  let readmeHtml = '';
+  if (comps._readmePath && hasDirAccess) {
+    readmeHtml = `<div class="readme-comp-item" onclick="openContentModal('${esc(pluginId)}', '${esc(comps._readmePath)}', 'readme')">
+      <span class="icon">${ICONS.readme}</span> ${esc(comps._readmePath)}
+    </div>`;
+  }
+
+  return (
+    readmeHtml +
+    entries
+      .map(([type, items]) => {
+        const names = Array.isArray(items) ? items : [];
+        const count = names.length || items;
+        let html = `<div class="detail-comp-group">
       <div class="detail-comp-header">
         <span class="comp-icon">${ICONS[type] || ''}</span>
         ${COMP_LABELS[type] || type}
         <span class="count">${count}</span>
       </div>`;
 
-      if (names.length) {
-        const configFile = configFiles[type];
-        const dir = COMP_HAS_DIR.has(type) ? type : null;
-        html += '<div class="detail-comp-items">';
-        for (const name of names) {
-          const clickPath = configFile || (dir ? `${dir}/${name}` : name);
-          const cls = hasDirAccess ? '' : ' disabled';
-          const click = hasDirAccess
-            ? ` onclick="openContentModal('${esc(pluginId)}', '${esc(clickPath)}', '${esc(type)}')"`
-            : '';
-          html += `<div class="detail-comp-item${cls}"${click}>
+        if (names.length) {
+          const configFile = configFiles[type];
+          const dir = COMP_HAS_DIR.has(type) ? type : null;
+          html += '<div class="detail-comp-items">';
+          for (const name of names) {
+            const clickPath = configFile || (dir ? `${dir}/${name}` : name);
+            const cls = hasDirAccess ? '' : ' disabled';
+            const click = hasDirAccess
+              ? ` onclick="openContentModal('${esc(pluginId)}', '${esc(clickPath)}', '${esc(type)}')"`
+              : '';
+            html += `<div class="detail-comp-item${cls}"${click}>
             <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
             ${esc(name)}
           </div>`;
+          }
+          html += '</div>';
         }
-        html += '</div>';
-      }
 
-      html += '</div>';
-      return html;
-    })
-    .join('');
+        html += '</div>';
+        return html;
+      })
+      .join('')
+  );
 }
 
 const EXT_TO_LANG = {
@@ -609,6 +624,26 @@ async function openFolderInEditor({ pluginId, marketplaceName } = {}) {
       body: JSON.stringify({ pluginId, marketplaceName }),
     });
   } catch {}
+}
+
+async function openReadmeModal(title, fetchUrl) {
+  _contentPluginId = null;
+  document.getElementById('contentModalTitle').textContent = `${title} \u2014 README`;
+  const tree = document.getElementById('contentTree');
+  const codeEl = getContentCodeEl();
+  const pathEl = document.getElementById('contentViewerPath');
+  tree.innerHTML = '';
+  pathEl.textContent = 'README.md';
+  codeEl.innerHTML = '<span style="color:var(--text-dim)">Loading...</span>';
+  document.getElementById('contentModal').classList.add('open');
+  try {
+    const res = await fetch(fetchUrl);
+    if (!res.ok) throw new Error('Not found');
+    const data = await res.json();
+    codeEl.innerHTML = highlightSource(data.content || '', data.name || 'README.md');
+  } catch {
+    codeEl.innerHTML = '<span style="color:var(--error)">Failed to load README</span>';
+  }
 }
 
 async function openContentModal(pluginId, initialPath, componentType) {
@@ -752,6 +787,7 @@ function showMarketplaceDetail(name) {
           <span class="meta-value">${installed} installed / ${total} total</span>
         </div>
       </div>
+      ${m.readmeFile ? `<div class="detail-section"><h4>Documentation</h4><div class="readme-comp-item" onclick="openReadmeModal('${esc(m.name)}', '/api/marketplaces/${encodeURIComponent(m.name)}/readme')">${ICONS.readme} ${esc(m.readmeFile)}</div></div>` : ''}
       <div class="detail-section">
         <h4>Actions</h4>
         <div class="mkt-actions">

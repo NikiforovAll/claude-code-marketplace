@@ -37,6 +37,12 @@ function readJsonSafe(filePath) {
   } catch { return null; }
 }
 
+function findReadmeFile(dirPath) {
+  try {
+    return fs.readdirSync(dirPath).find(f => f.toLowerCase() === 'readme.md') || null;
+  } catch { return null; }
+}
+
 function readJsonKey(filePath, key) {
   const data = readJsonSafe(filePath);
   return data ? (data[key] || {}) : {};
@@ -168,6 +174,8 @@ function loadMarketplaces() {
     marketplace.version = mData.version || null;
     marketplace.owner = mData.owner || null;
     marketplace.description = mData.description || null;
+    const mktReadme = findReadmeFile(installLocation);
+    if (mktReadme) marketplace.readmeFile = mktReadme;
 
     for (const pd of (mData.plugins || [])) {
       if (!pd.name) continue;
@@ -370,6 +378,9 @@ function countComponents(pluginDir, meta = {}) {
     }
   }
 
+  const readmeFile = findReadmeFile(pluginDir);
+  if (readmeFile) result._readmePath = readmeFile;
+
   result._configFiles = configFiles;
   return result;
 }
@@ -526,6 +537,18 @@ app.get('/api/marketplaces', (req, res) => {
     res.json(getCachedMarketplaces());
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/marketplaces/:name/readme', (req, res) => {
+  const mktData = getCachedMarketplaces();
+  const m = mktData.find(m => m.name === req.params.name);
+  if (!m?.readmeFile) return res.status(404).json({ error: 'No README found' });
+  try {
+    const content = fs.readFileSync(path.join(m.installLocation, m.readmeFile), 'utf-8');
+    res.json({ type: 'file', content, name: m.readmeFile });
+  } catch {
+    res.status(404).json({ error: 'Failed to read README' });
   }
 });
 
