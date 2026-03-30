@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('light');
   }
   syncHljsTheme();
+  updateThemeColor(savedTheme !== 'dark');
 
   document.addEventListener('keydown', handleKeydown);
 });
@@ -130,6 +131,12 @@ function syncHljsTheme() {
   const lightSheet = document.getElementById('hljsLight');
   if (darkSheet) darkSheet.disabled = light;
   if (lightSheet) lightSheet.disabled = !light;
+}
+
+function updateThemeColor(isLight) {
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+    m.setAttribute('content', isLight ? '#e8e6e3' : '#101114');
+  });
 }
 
 function toggleTheme() {
@@ -143,6 +150,7 @@ function toggleTheme() {
     localStorage.setItem('theme', 'light');
   }
   syncHljsTheme();
+  updateThemeColor(!isLight);
 }
 
 async function loadProject() {
