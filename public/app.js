@@ -48,6 +48,8 @@ ICONS.readme = SVG(
 ICONS.settings = ICONS.gear;
 ICONS.openEditor =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.583 2.207a1.1 1.1 0 0 1 1.541.033l2.636 2.636a1.1 1.1 0 0 1 .033 1.541L10.68 17.53a1.1 1.1 0 0 1-.345.247l-4.56 1.903a.55.55 0 0 1-.725-.725l1.903-4.56a1.1 1.1 0 0 1 .247-.345zm.902 1.87-8.794 8.793-.946 2.268 2.268-.946 8.794-8.793z"/></svg>';
+ICONS.copyPath =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 const COMP_HAS_DIR = new Set(['skills', 'commands', 'agents']);
 const COMP_LABELS = {
   skills: 'Skills',
@@ -72,6 +74,7 @@ function updateArrow(p) {
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('contentOpenEditor').innerHTML = ICONS.openEditor;
+  document.getElementById('contentCopyPath').innerHTML = ICONS.copyPath;
   restoreAppState();
   loadProject();
   loadData();
@@ -447,7 +450,7 @@ async function showDetail(pluginId) {
     <div class="detail-header">
       <h3>${headerIcon} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
-        ${plugin._pluginDir ? `<button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({pluginId:'${esc(plugin.fullId)}'})">${ICONS.openEditor}</button>` : ''}
+        ${plugin._pluginDir ? `<button class="modal-action-btn" title="${esc(plugin._pluginDir)}" onclick="copyPluginPath('${escJs(plugin._pluginDir)}', event)">${ICONS.copyPath}</button><button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({pluginId:'${esc(plugin.fullId)}',event})">${ICONS.openEditor}</button>` : ''}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
       </div>
     </div>
@@ -576,6 +579,7 @@ const EXT_TO_LANG = {
 const PREFERRED_FILE = 'SKILL.MD';
 let _contentCodeEl = null;
 let _contentPluginId = null;
+let _contentPluginDir = null;
 
 function highlightSource(text, fileName) {
   const ext = (fileName || '').split('.').pop().toLowerCase();
@@ -603,31 +607,72 @@ function getContentCodeEl() {
   return _contentCodeEl;
 }
 
-async function openInEditor() {
-  if (!_contentPluginId) return;
-  const relativePath = document.getElementById('contentViewerPath').textContent || '';
+async function postAndFlash(endpoint, data, btn) {
   try {
-    await fetch('/api/open-in-editor', {
+    await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pluginId: _contentPluginId, relativePath }),
+      body: JSON.stringify(data),
     });
+    if (btn) flashButton(btn);
   } catch {}
 }
 
-async function openFolderInEditor({ pluginId, marketplaceName } = {}) {
-  if (!pluginId && !marketplaceName) return;
+async function openInEditor(event) {
+  if (!_contentPluginId) return;
+  const relativePath = document.getElementById('contentViewerPath').textContent || '';
+  await postAndFlash('/api/open-in-editor', { pluginId: _contentPluginId, relativePath }, event?.currentTarget);
+}
+
+const CHECKMARK_SVG =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+function flashButton(btn) {
+  if (btn._flashTimeout) clearTimeout(btn._flashTimeout);
+  if (!btn._flashOrig) btn._flashOrig = btn.innerHTML;
+  btn.innerHTML = CHECKMARK_SVG;
+  btn.classList.add('copy-success');
+  btn._flashTimeout = setTimeout(() => {
+    btn.innerHTML = btn._flashOrig;
+    btn.classList.remove('copy-success');
+    btn._flashOrig = null;
+    btn._flashTimeout = null;
+  }, 1000);
+}
+
+async function copyToClipboard(text, btn) {
   try {
-    await fetch('/api/open-folder-in-editor', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pluginId, marketplaceName }),
-    });
-  } catch {}
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  if (btn) flashButton(btn);
+}
+
+async function copyContentPath(event) {
+  if (!_contentPluginDir) return;
+  const relativePath = document.getElementById('contentViewerPath').textContent || '';
+  const full = relativePath ? `${_contentPluginDir}/${relativePath}` : _contentPluginDir;
+  await copyToClipboard(full, event?.currentTarget);
+}
+
+async function copyPluginPath(pluginDir, event) {
+  if (pluginDir) await copyToClipboard(pluginDir, event?.currentTarget);
+}
+
+async function openFolderInEditor({ pluginId, marketplaceName, event } = {}) {
+  if (!pluginId && !marketplaceName) return;
+  await postAndFlash('/api/open-folder-in-editor', { pluginId, marketplaceName }, event?.currentTarget);
 }
 
 async function openReadmeModal(title, fetchUrl) {
   _contentPluginId = null;
+  _contentPluginDir = null;
   document.getElementById('contentModalTitle').textContent = `${title} \u2014 README`;
   const tree = document.getElementById('contentTree');
   const codeEl = getContentCodeEl();
@@ -648,6 +693,8 @@ async function openReadmeModal(title, fetchUrl) {
 
 async function openContentModal(pluginId, initialPath, componentType) {
   _contentPluginId = pluginId;
+  const comps = await fetchComponents(pluginId);
+  _contentPluginDir = comps?._pluginDir || null;
   const plugin = findPlugin(pluginId);
   const label = COMP_LABELS[componentType] || componentType;
   document.getElementById('contentModalTitle').textContent = `${plugin?.name || pluginId} \u2014 ${label}`;
@@ -767,7 +814,7 @@ function showMarketplaceDetail(name) {
     <div class="detail-header">
       <h3>${ICONS.marketplace} ${esc(m.name)} ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
-        ${m.installLocation ? `<button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({marketplaceName:'${esc(m.name)}'})">${ICONS.openEditor}</button>` : ''}
+        ${m.installLocation ? `<button class="modal-action-btn" title="${esc(m.installLocation)}" onclick="copyPluginPath('${escJs(m.installLocation)}', event)">${ICONS.copyPath}</button><button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({marketplaceName:'${esc(m.name)}',event})">${ICONS.openEditor}</button>` : ''}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
       </div>
     </div>
@@ -1002,6 +1049,11 @@ function esc(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function escJs(str) {
+  if (!str) return '';
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 function shortenPath(p) {
