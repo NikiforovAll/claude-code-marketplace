@@ -781,6 +781,39 @@ body.light .scope-toggle.local {
   letter-spacing: 0.03em;
 }
 
+.plugin-meta-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.meta-tag {
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+.meta-chip {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.meta-link {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.meta-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 /* === SCOPE MATRIX === */
 
 .scope-matrix {

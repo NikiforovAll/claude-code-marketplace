@@ -476,6 +476,7 @@ async function showDetail(pluginId) {
       <div class="detail-section">
         <p class="detail-desc">${esc(plugin.description || 'No description')}</p>
         ${metaRow}
+        ${renderPluginMetadata(plugin)}
       </div>
       ${scopeSection}
       <div class="detail-section">
@@ -522,6 +523,42 @@ function renderScopeMatrix(plugin) {
     </div>`;
     })
     .join('')}</div>`;
+}
+
+function shortUrl(url) {
+  return url
+    .replace(/^https?:\/\/(www\.)?/, '')
+    .replace(/\.git$/, '')
+    .replace(/\/$/, '');
+}
+
+function renderPluginMetadata(plugin) {
+  const meta = plugin.metadata || {};
+  const chips = [];
+  if (meta.category) chips.push(`<span class="meta-tag">${esc(meta.category)}</span>`);
+  if (meta.author) {
+    const name = typeof meta.author === 'object' ? meta.author.name : meta.author;
+    if (name) chips.push(`<span class="meta-chip">${esc(name)}</span>`);
+  }
+  if (meta.tags?.length) {
+    for (const t of meta.tags) chips.push(`<span class="meta-tag">${esc(t)}</span>`);
+  }
+  const links = [];
+  if (meta.homepage) {
+    links.push(
+      `<a class="meta-link" href="${esc(meta.homepage)}" target="_blank" rel="noopener">${esc(shortUrl(meta.homepage))}</a>`,
+    );
+  }
+  if (plugin.source && typeof plugin.source === 'string' && plugin.source.startsWith('http')) {
+    const href = plugin.source.replace(/\.git$/, '');
+    if (!meta.homepage || !plugin.source.includes(meta.homepage)) {
+      links.push(
+        `<a class="meta-link" href="${esc(href)}" target="_blank" rel="noopener">${esc(shortUrl(plugin.source))}</a>`,
+      );
+    }
+  }
+  if (!chips.length && !links.length) return '';
+  return `<div class="plugin-meta-bar">${chips.join('')}${links.join('')}</div>`;
 }
 
 function renderDetailComponents(pluginId, comps, hasDirAccess) {
@@ -1025,7 +1062,11 @@ function filterPlugins(plugins) {
   }
   if (searchFilter) {
     result = result.filter(
-      (p) => p.name.toLowerCase().includes(searchFilter) || (p.description || '').toLowerCase().includes(searchFilter),
+      (p) =>
+        p.name.toLowerCase().includes(searchFilter) ||
+        (p.description || '').toLowerCase().includes(searchFilter) ||
+        (p.metadata?.category || '').toLowerCase().includes(searchFilter) ||
+        (p.metadata?.tags || []).some((t) => t.toLowerCase().includes(searchFilter)),
     );
   }
   return result;
