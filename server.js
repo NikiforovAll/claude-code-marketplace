@@ -218,10 +218,21 @@ function loadMarketplaces() {
           const srcDir = path.resolve(installLocation, rawSource);
           if (fs.existsSync(srcDir)) originDir = srcDir;
         }
+        if (!originDir && typeof rawSource === 'object' && rawSource?.path) {
+          const srcDir = path.resolve(installLocation, rawSource.path);
+          if (fs.existsSync(srcDir)) originDir = srcDir;
+        }
         if (!originDir) {
           const pluginSubdir = path.join(installLocation, 'plugins', pd.name);
           if (fs.existsSync(pluginSubdir)) originDir = pluginSubdir;
           else if ((mData.plugins || []).length === 1) originDir = installLocation;
+        }
+        if (!originDir) {
+          const cacheDir = path.join(PLUGINS_DIR, 'cache', name, pd.name);
+          if (fs.existsSync(cacheDir)) {
+            const latest = findLatestVersionDir(cacheDir);
+            if (latest) originDir = latest;
+          }
         }
       }
 
@@ -250,11 +261,13 @@ function loadMarketplaces() {
         .find(d => d?.version && d.version !== 'unknown')?.version || null;
 
       let availableVersion = pd.version || null;
-      if (!availableVersion && installLocation) {
-        const sourceDir = pd.source || `plugins/${pd.name}`;
-        const pluginJson = path.join(installLocation, typeof sourceDir === 'string' ? sourceDir : pd.name, '.claude-plugin', 'plugin.json');
-        const pjData = readJsonSafe(pluginJson);
-        if (pjData?.version) availableVersion = pjData.version;
+      if (!availableVersion) {
+        const versionDir = pluginDir || originDir;
+        if (versionDir) {
+          const pluginJson = path.join(versionDir, '.claude-plugin', 'plugin.json');
+          const pjData = readJsonSafe(pluginJson);
+          if (pjData?.version) availableVersion = pjData.version;
+        }
       }
       const hasUpdate = isInstalled && semverNewer(availableVersion, installedVersion);
 
