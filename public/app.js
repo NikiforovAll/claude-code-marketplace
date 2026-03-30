@@ -123,6 +123,15 @@ document.addEventListener('DOMContentLoaded', () => {
   updateThemeColor(savedTheme !== 'dark');
 
   document.addEventListener('keydown', handleKeydown);
+
+  document.getElementById('treeContainer').addEventListener('click', (e) => {
+    const row = e.target.closest('.tree-row');
+    if (!row?.dataset.rowId) return;
+    const rowId = row.dataset.rowId;
+    const rows = getVisibleRows();
+    const idx = rows.findIndex((r) => r.dataset.rowId === rowId);
+    if (idx >= 0) setFocusedRow(idx, rows);
+  });
 });
 
 function syncHljsTheme() {
@@ -1157,7 +1166,8 @@ function handleKeydown(e) {
     }
     return;
   }
-  if ((tag === 'BUTTON' || tag === 'A') && (e.key === 'Enter' || e.key === ' ')) return;
+  if ((tag === 'BUTTON' || tag === 'A') && (e.key === 'Enter' || e.key === ' ') && !e.target.closest('#treeContainer'))
+    return;
 
   const openModal = document.querySelector('.modal-overlay.open');
   if (openModal) {
