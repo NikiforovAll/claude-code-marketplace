@@ -42,9 +42,9 @@ body.light {
   --bg-hover: #d2d0cc;
   --border: #a09b94;
   --text-primary: #0a0a0a;
-  --text-secondary: #444444;
-  --text-tertiary: #666666;
-  --text-muted: #888888;
+  --text-secondary: #333333;
+  --text-tertiary: #555555;
+  --text-muted: #777777;
   --accent-text: #b85a20;
   --accent-dim: rgba(232, 111, 51, 0.18);
   --accent-glow: rgba(232, 111, 51, 0.5);
