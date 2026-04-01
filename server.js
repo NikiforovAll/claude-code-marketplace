@@ -262,7 +262,8 @@ function loadMarketplaces() {
 
       let availableVersion = pd.version || null;
       if (!availableVersion) {
-        const versionDir = pluginDir || originDir;
+        // Use originDir (source copy) for available version, not pluginDir (installed/cached copy)
+        const versionDir = originDir || pluginDir;
         if (versionDir) {
           const pluginJson = path.join(versionDir, '.claude-plugin', 'plugin.json');
           const pjData = readJsonSafe(pluginJson);
