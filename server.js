@@ -31,6 +31,10 @@ let projectPath = getArg('project') || process.cwd();
 if (projectPath.startsWith('~')) projectPath = projectPath.replace('~', os.homedir());
 const PORT = parseInt(getArg('port') || process.env.PORT || '3457', 10);
 
+function toUnixPath(p) {
+  return p ? p.replace(/\\/g, '/') : p;
+}
+
 function readJsonSafe(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -157,7 +161,7 @@ function loadMarketplaces() {
         path: sourceData.path || null,
         url: sourceData.url || null,
       },
-      installLocation,
+      installLocation: toUnixPath(installLocation),
       lastUpdated: entryData.lastUpdated || null,
       version: null,
       plugins: [],
@@ -285,8 +289,8 @@ function loadMarketplaces() {
         scopeDetails,
         installedScopes,
         components,
-        _pluginDir: pluginDir,
-        _originDir: originDir,
+        _pluginDir: toUnixPath(pluginDir),
+        _originDir: toUnixPath(originDir),
         _fsComps: fsComps,
         metadata: Object.fromEntries(
           Object.entries(pd).filter(([k]) => !['name', 'description', 'source', 'version', ...compKeys].includes(k))
@@ -473,7 +477,7 @@ function scanCustomizations(basePath, scope) {
       scopeDetails,
       installedScopes: [scope],
       components,
-      _pluginDir: basePath,
+      _pluginDir: toUnixPath(basePath),
       _fsComps: components,
       metadata: {},
     }],
