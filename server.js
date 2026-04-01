@@ -7,6 +7,11 @@ const { execFile } = require('child_process');
 
 const app = express();
 app.use(express.json());
+
+app.get('/hub-config', (_req, res) => {
+  res.json({ enabled: !!process.env.CLAUDE_HUB, url: process.env.HUB_URL || null });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
