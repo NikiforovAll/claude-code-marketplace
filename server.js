@@ -452,6 +452,15 @@ function scanCustomizations(basePath, scope) {
   if (fs.existsSync(path.join(basePath, 'settings.local.json'))) settingsFiles.push('settings.local.json');
   if (settingsFiles.length) components.settings = settingsFiles;
 
+  // Add CLAUDE.md files as browsable entries
+  const claudeMdFiles = [];
+  if (fs.existsSync(path.join(basePath, 'CLAUDE.md'))) claudeMdFiles.push('CLAUDE.md');
+  if (scope === 'project') {
+    const parentClaude = path.join(basePath, '..', 'CLAUDE.md');
+    if (fs.existsSync(parentClaude)) claudeMdFiles.push('~root/CLAUDE.md');
+  }
+  if (claudeMdFiles.length) components.claudeMd = claudeMdFiles;
+
   const hasAny = Object.values(components).some(v => Array.isArray(v) && v.length > 0);
   if (!hasAny) return null;
 
@@ -552,6 +561,20 @@ function resolvePluginDir(fullId, marketplaces) {
   return findPlugin(fullId, marketplaces)?._pluginDir || null;
 }
 
+function resolveVirtualRelPath(pluginId, relPath) {
+  return pluginId === '_custom/project' && relPath.startsWith('~root/')
+    ? path.join('..', relPath.slice(6))
+    : relPath;
+}
+
+function isPathAllowed(fullPath, pluginDir, pluginId) {
+  if (fullPath.startsWith(path.resolve(pluginDir))) return true;
+  if (pluginId === '_custom/project') {
+    return fullPath === path.join(path.resolve(pluginDir, '..'), 'CLAUDE.md');
+  }
+  return false;
+}
+
 // --- API Routes ---
 
 app.get('/api/marketplaces', (req, res) => {
@@ -598,8 +621,8 @@ app.get('/api/plugins/:pluginId/preview/*', (req, res) => {
   const pluginDir = resolvePluginDir(pluginId, marketplaces);
   if (!pluginDir) return res.status(404).json({ error: 'Plugin not found' });
 
-  let fullPath = path.resolve(pluginDir, relPath);
-  if (!fullPath.startsWith(path.resolve(pluginDir))) {
+  let fullPath = path.resolve(pluginDir, resolveVirtualRelPath(pluginId, relPath));
+  if (!isPathAllowed(fullPath, pluginDir, pluginId)) {
     return res.status(403).json({ error: 'Access denied' });
   }
   if (!fs.existsSync(fullPath) && fs.existsSync(fullPath + '.md')) fullPath += '.md';
@@ -642,10 +665,8 @@ app.post('/api/open-in-editor', (req, res) => {
   if (fs.existsSync(pluginJson)) args.push(pluginJson);
 
   if (relativePath) {
-    const fullPath = path.resolve(pluginDir, relativePath);
-    if (fullPath.startsWith(path.resolve(pluginDir))) {
-      args.push(fullPath);
-    }
+    const fullPath = path.resolve(pluginDir, resolveVirtualRelPath(pluginId, relativePath));
+    if (isPathAllowed(fullPath, pluginDir, pluginId)) args.push(fullPath);
   }
 
   openVSCode(args, res);

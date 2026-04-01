@@ -46,6 +46,7 @@ ICONS.readme = SVG(
   '<path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>',
 );
 ICONS.settings = ICONS.gear;
+ICONS.claudeMd = ICONS.readme;
 ICONS.openEditor =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.583 2.207a1.1 1.1 0 0 1 1.541.033l2.636 2.636a1.1 1.1 0 0 1 .033 1.541L10.68 17.53a1.1 1.1 0 0 1-.345.247l-4.56 1.903a.55.55 0 0 1-.725-.725l1.903-4.56a1.1 1.1 0 0 1 .247-.345zm.902 1.87-8.794 8.793-.946 2.268 2.268-.946 8.794-8.793z"/></svg>';
 ICONS.copyPath =
@@ -59,8 +60,25 @@ const COMP_LABELS = {
   hooks: 'Hooks',
   lspServers: 'LSP Servers',
   settings: 'Settings',
+  claudeMd: 'CLAUDE.md',
   readme: 'README',
 };
+
+const VIRTUAL_ROOT_PREFIX = '~root/';
+
+function encodePathSegments(p) {
+  return p.split('/').map(encodeURIComponent).join('/');
+}
+
+function getContentRelativePath() {
+  const el = document.getElementById('contentViewerPath');
+  return el.dataset.rawPath || el.textContent || '';
+}
+
+function claudeMdLabel(name, count) {
+  if (name.startsWith(VIRTUAL_ROOT_PREFIX)) return count > 1 ? 'CLAUDE.md (project root)' : 'CLAUDE.md';
+  return count > 1 ? 'CLAUDE.md (.claude/)' : name;
+}
 
 function updateArrow(p) {
   if (!p.hasUpdate) return '';
@@ -601,7 +619,7 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
               : '';
             html += `<div class="detail-comp-item${cls}"${click}>
             <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
-            ${esc(name)}
+            ${esc(type === 'claudeMd' ? claudeMdLabel(name, names.length) : name)}
           </div>`;
           }
           html += '</div>';
@@ -674,7 +692,7 @@ async function postAndFlash(endpoint, data, btn) {
 
 async function openInEditor(event) {
   if (!_contentPluginId) return;
-  const relativePath = document.getElementById('contentViewerPath').textContent || '';
+  const relativePath = getContentRelativePath();
   await postAndFlash('/api/open-in-editor', { pluginId: _contentPluginId, relativePath }, event?.currentTarget);
 }
 
@@ -710,8 +728,14 @@ async function copyToClipboard(text, btn) {
 
 async function copyContentPath(event) {
   if (!_contentPluginDir) return;
-  const relativePath = document.getElementById('contentViewerPath').textContent || '';
-  const full = relativePath ? `${_contentPluginDir}/${relativePath}` : _contentPluginDir;
+  const relativePath = getContentRelativePath();
+  let full;
+  if (relativePath.startsWith(VIRTUAL_ROOT_PREFIX)) {
+    const parentDir = _contentPluginDir.replace(/\/[^/]+\/?$/, '');
+    full = `${parentDir}/${relativePath.slice(VIRTUAL_ROOT_PREFIX.length)}`;
+  } else {
+    full = relativePath ? `${_contentPluginDir}/${relativePath}` : _contentPluginDir;
+  }
   await copyToClipboard(full, event?.currentTarget);
 }
 
@@ -766,7 +790,7 @@ async function openContentModal(pluginId, initialPath, componentType) {
 
 async function loadContentTree(pluginId, treePath, container, depth, autoSelect) {
   try {
-    const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/preview/${treePath}`);
+    const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/preview/${encodePathSegments(treePath)}`);
     if (!res.ok) throw new Error('Not found');
     const data = await res.json();
 
@@ -816,7 +840,8 @@ async function loadContentTree(pluginId, treePath, container, depth, autoSelect)
 async function loadContentFile(pluginId, filePath) {
   const codeEl = getContentCodeEl();
   const pathEl = document.getElementById('contentViewerPath');
-  pathEl.textContent = filePath;
+  pathEl.textContent = filePath.startsWith(VIRTUAL_ROOT_PREFIX) ? filePath.slice(VIRTUAL_ROOT_PREFIX.length) : filePath;
+  pathEl.dataset.rawPath = filePath;
   codeEl.innerHTML = '<span style="color:var(--text-dim)">Loading...</span>';
 
   document.querySelectorAll('#contentTree .content-tree-item.active').forEach((el) => el.classList.remove('active'));
@@ -824,7 +849,7 @@ async function loadContentFile(pluginId, filePath) {
   if (activeItem) activeItem.classList.add('active');
 
   try {
-    const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/preview/${filePath}`);
+    const res = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}/preview/${encodePathSegments(filePath)}`);
     if (!res.ok) throw new Error('Not found');
     const data = await res.json();
 
