@@ -1002,6 +1002,25 @@ function restoreAppState() {
   if (params.has('plugin')) {
     selectedPluginId = params.get('plugin');
   }
+  if (params.has('project')) {
+    const projectPath = params.get('project');
+    fetch('/api/project', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: projectPath }),
+    })
+      .then((r) => {
+        if (r.ok) {
+          loadProject();
+          loadData();
+        }
+      })
+      .catch(() => {});
+    const cleanParams = new URLSearchParams(window.location.search);
+    cleanParams.delete('project');
+    const qs = cleanParams.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+  }
   try {
     const saved = JSON.parse(localStorage.getItem('expandedNodes') || '[]');
     saved.forEach((n) => expandedNodes.add(n));
