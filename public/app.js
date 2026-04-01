@@ -1369,6 +1369,10 @@ if ('serviceWorker' in navigator) {
       e.preventDefault();
       window.parent?.postMessage({ type: 'hub:keydown', key: e.key }, '*');
     }
+    if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && /^[1-9]$/.test(e.key)) {
+      e.preventDefault();
+      window.parent?.postMessage({ type: 'hub:keydown', key: e.key }, '*');
+    }
   });
 })();
 
