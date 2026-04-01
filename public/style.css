@@ -472,8 +472,8 @@ body {
   border-color: var(--scope-local);
 }
 .scope-toggle.disabled {
-  opacity: 0.4;
-  text-decoration: line-through;
+  border-style: dashed;
+  opacity: 0.6;
 }
 
 /* Light theme: boost inactive scope contrast further */
