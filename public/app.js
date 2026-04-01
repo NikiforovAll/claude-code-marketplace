@@ -394,8 +394,8 @@ function renderPluginRow(p) {
     <span class="tree-icon">${icon}</span>
     <span class="tree-label">${esc(p.name)} ${ver} ${updateIndicator}</span>
     ${desc}
-    ${scopes}
     ${summary}
+    ${scopes}
   </div>`;
 
   return html;
