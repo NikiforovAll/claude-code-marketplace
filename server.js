@@ -374,7 +374,7 @@ function countComponents(pluginDir, meta = {}) {
     const data = readJsonSafe(mcpFile);
     if (data) {
       result.mcpServers = Object.keys(data.mcpServers || data);
-      if (result.mcpServers.length) configFiles.mcpServers = mcpPath;
+      if (result.mcpServers.length) configFiles.mcpServers = toUnixPath(mcpPath);
     }
   }
 
@@ -386,7 +386,7 @@ function countComponents(pluginDir, meta = {}) {
     if (data) {
       const hooksObj = data.hooks || data;
       result.hooks = Object.keys(hooksObj).filter(k => k !== 'description');
-      if (result.hooks.length) configFiles.hooks = hooksPath;
+      if (result.hooks.length) configFiles.hooks = toUnixPath(hooksPath);
     }
   }
 
@@ -397,7 +397,7 @@ function countComponents(pluginDir, meta = {}) {
     const data = readJsonSafe(lspFile);
     if (data) {
       result.lspServers = Object.keys(data.lspServers || data);
-      if (result.lspServers.length) configFiles.lspServers = lspPath;
+      if (result.lspServers.length) configFiles.lspServers = toUnixPath(lspPath);
     }
   }
 

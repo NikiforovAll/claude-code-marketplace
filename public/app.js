@@ -589,7 +589,7 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
 
   let readmeHtml = '';
   if (comps._readmePath && hasDirAccess) {
-    readmeHtml = `<div class="readme-comp-item" onclick="openContentModal('${esc(pluginId)}', '${esc(comps._readmePath)}', 'readme')">
+    readmeHtml = `<div class="readme-comp-item" onclick="openContentModal('${escJs(pluginId)}', '${escJs(comps._readmePath)}', 'readme')">
       <span class="icon">${ICONS.readme}</span> ${esc(comps._readmePath)}
     </div>`;
   }
@@ -615,7 +615,7 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
             const clickPath = configFile || (dir ? `${dir}/${name}` : name);
             const cls = hasDirAccess ? '' : ' disabled';
             const click = hasDirAccess
-              ? ` onclick="openContentModal('${esc(pluginId)}', '${esc(clickPath)}', '${esc(type)}')"`
+              ? ` onclick="openContentModal('${escJs(pluginId)}', '${escJs(clickPath)}', '${escJs(type)}')"`
               : '';
             html += `<div class="detail-comp-item${cls}"${click}>
             <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
