@@ -427,9 +427,8 @@ const VIRTUAL_PREFIX = '_custom/';
 const SCOPE_LABELS = { user: 'User Customizations', project: 'Project Customizations' };
 const EMPTY_SCOPE = { installed: false, enabled: false, version: null, installPath: null };
 
-function scanCustomizations(basePath, scope) {
+function rescanVirtualComponents(basePath, scope) {
   const components = countComponents(basePath);
-
   // Strip .md extensions from command/agent names for cleaner display
   components.commands = components.commands.map(n => n.replace(/\.md$/, ''));
   components.agents = components.agents.map(n => n.replace(/\.md$/, ''));
@@ -460,6 +459,12 @@ function scanCustomizations(basePath, scope) {
     if (fs.existsSync(parentClaude)) claudeMdFiles.push('~root/CLAUDE.md');
   }
   if (claudeMdFiles.length) components.claudeMd = claudeMdFiles;
+
+  return components;
+}
+
+function scanCustomizations(basePath, scope) {
+  const components = rescanVirtualComponents(basePath, scope);
 
   const hasAny = Object.values(components).some(v => Array.isArray(v) && v.length > 0);
   if (!hasAny) return null;
@@ -605,7 +610,10 @@ app.get('/api/plugins/:pluginId/components', (req, res) => {
   const plugin = findPlugin(pluginId, mktData);
 
   if (plugin?.isVirtual) {
-    return res.json({ ...plugin.components, _pluginDir: plugin._pluginDir });
+    const scope = plugin.fullId.replace(VIRTUAL_PREFIX, '');
+    const comps = rescanVirtualComponents(plugin._pluginDir, scope);
+    comps._pluginDir = plugin._pluginDir;
+    return res.json(comps);
   }
   if (!plugin?._pluginDir) return res.status(404).json({ error: 'Plugin directory not found', pluginId });
 
