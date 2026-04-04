@@ -1299,6 +1299,12 @@ function handleKeydown(e) {
     return;
   }
 
+  if (matchKey(e, 't')) {
+    e.preventDefault();
+    toggleTheme();
+    return;
+  }
+
   const rows = getVisibleRows();
   const idx = getFocusedIndex(rows);
 
