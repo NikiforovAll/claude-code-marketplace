@@ -7,6 +7,7 @@ let componentCache = {};
 const detailHistory = [];
 let focusedRowId = null;
 let _focusedRowEl = null;
+let treeContainer;
 
 function matchKey(e, ...keys) {
   if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return false;
@@ -91,11 +92,13 @@ function updateArrow(p) {
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
+  treeContainer = document.getElementById('treeContainer');
   document.getElementById('contentOpenEditor').innerHTML = ICONS.openEditor;
   document.getElementById('contentCopyPath').innerHTML = ICONS.copyPath;
   restoreAppState();
   loadProject();
   loadData();
+  initSidebarResize();
 
   let searchTimer;
   document.getElementById('searchInput').addEventListener('input', (e) => {
@@ -1168,13 +1171,13 @@ function shortenPath(p) {
     .replace(/^\/home\/[^/]+/i, home);
 }
 
-let toastTimeout;
 function toast(msg, type = 'info') {
-  const el = document.getElementById('toast');
+  const container = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
   el.textContent = msg;
-  el.className = `toast ${type} show`;
-  clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => el.classList.remove('show'), 3000);
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
 }
 
 function closeModal(id) {
@@ -1218,7 +1221,19 @@ async function submitAddMarketplace() {
 // --- Keyboard Navigation ---
 
 function getVisibleRows() {
-  return [...document.querySelectorAll('#treeContainer .tree-row')].filter((r) => r.offsetParent !== null);
+  return [...treeContainer.querySelectorAll('.tree-row')].filter((r) => r.offsetParent !== null);
+}
+
+function scrollRowIntoView(row) {
+  const rowTop = row.getBoundingClientRect().top - treeContainer.getBoundingClientRect().top + treeContainer.scrollTop;
+  const rowBottom = rowTop + row.offsetHeight;
+  const cTop = treeContainer.scrollTop;
+  const cBottom = cTop + treeContainer.clientHeight;
+  if (rowTop < cTop) {
+    treeContainer.scrollTop = rowTop;
+  } else if (rowBottom > cBottom) {
+    treeContainer.scrollTop = rowBottom - treeContainer.clientHeight;
+  }
 }
 
 function setFocusedRow(index, rows) {
@@ -1232,7 +1247,7 @@ function setFocusedRow(index, rows) {
   index = Math.max(0, Math.min(index, rows.length - 1));
   const row = rows[index];
   row.classList.add('focused');
-  row.scrollIntoView({ block: 'nearest' });
+  scrollRowIntoView(row);
   focusedRowId = row.dataset.rowId;
   _focusedRowEl = row;
 }
@@ -1386,6 +1401,46 @@ function showHelpModal() {
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
+}
+
+function initSidebarResize() {
+  const handle = document.getElementById('resizeHandle');
+  const treePanel = document.getElementById('treePanel');
+  const STORAGE_KEY = 'marketplace-sidebar-width';
+
+  const saved = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+  if (saved) document.documentElement.style.setProperty('--sidebar-w', `${saved}px`);
+
+  let dragging = false;
+  let startX, startW, maxW, currentW;
+
+  handle.addEventListener('mousedown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startW = treePanel.getBoundingClientRect().width;
+    currentW = startW;
+    const detailMinW = parseInt(getComputedStyle(document.getElementById('detailPanel')).minWidth, 10);
+    maxW = treePanel.parentElement.clientWidth - detailMinW - handle.offsetWidth;
+    handle.classList.add('is-dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    currentW = Math.max(200, Math.min(maxW, startW + e.clientX - startX));
+    document.documentElement.style.setProperty('--sidebar-w', `${currentW}px`);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('is-dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    localStorage.setItem(STORAGE_KEY, currentW);
+  });
 }
 
 // #region HUB_INTEGRATION

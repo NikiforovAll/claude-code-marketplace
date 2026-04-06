@@ -279,11 +279,25 @@ body {
 /* === TREE PANEL === */
 
 .tree-panel {
-  flex: 1;
+  flex: 0 0 var(--sidebar-w, 400px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-width: 400px;
+  min-width: 200px;
+}
+
+.resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 1;
+}
+.resize-handle:hover,
+.resize-handle.is-dragging {
+  background: var(--accent);
 }
 
 .tree-expand-toggle {
@@ -670,8 +684,8 @@ body.light .scope-toggle.local {
 /* === DETAIL PANEL === */
 
 .detail-panel {
-  width: 500px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 300px;
   background: var(--bg-surface);
   border-left: 1px solid var(--border);
   display: flex;
@@ -995,37 +1009,47 @@ body.light .scope-toggle.local {
 
 /* === TOAST === */
 
-.toast {
+.toast-container {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 10px 16px;
+  bottom: 16px;
+  right: 16px;
+  z-index: 100;
+}
+
+.toast {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--mono);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  opacity: 0;
-  transform: translateY(10px);
-  transition: all 300ms ease;
-  max-width: 400px;
+  padding: 8px 14px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  animation: slideIn 0.2s ease;
 }
-.toast.show {
-  opacity: 1;
-  transform: translateY(0);
+
+.toast.toast-success {
+  border-color: #2ea043;
+  color: #2ea043;
 }
-.toast.success {
-  background: var(--success);
-  color: #000;
+
+.toast.toast-error {
+  border-color: #f85149;
+  color: #f85149;
 }
-.toast.error {
-  background: var(--error);
-  color: #fff;
+
+.toast.toast-info {
+  border-color: var(--accent);
+  color: var(--accent);
 }
-.toast.info {
-  background: var(--accent);
-  color: #fff;
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* === MODAL === */
