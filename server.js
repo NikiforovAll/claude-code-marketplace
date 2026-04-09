@@ -258,7 +258,12 @@ function loadMarketplaces() {
       const components = {};
       for (const k of compKeys) {
         if (fsComps && Array.isArray(fsComps[k]) && fsComps[k].length > 0) {
-          components[k] = fsComps[k];
+          if (Array.isArray(pd[k]) && pd[k].length > 0) {
+            const allowed = new Set(pd[k].map(p => path.basename(typeof p === 'string' ? p : (p.name || String(p)))));
+            components[k] = fsComps[k].filter(name => allowed.has(name));
+          } else {
+            components[k] = fsComps[k];
+          }
         } else if (Array.isArray(pd[k]) && pd[k].length > 0) {
           components[k] = pd[k].map(p => typeof p === 'string' ? path.basename(p) : (p.name || String(p)));
         } else if (pd[k]) {
@@ -617,9 +622,9 @@ app.get('/api/plugins/:pluginId/components', (req, res) => {
   }
   if (!plugin?._pluginDir) return res.status(404).json({ error: 'Plugin directory not found', pluginId });
 
-  const comps = plugin._fsComps || countComponents(plugin._pluginDir, plugin.metadata);
-  comps._pluginDir = plugin._pluginDir;
-  res.json(comps);
+  const comps = plugin.components || plugin._fsComps || countComponents(plugin._pluginDir, plugin.metadata);
+  const result = { ...comps, _pluginDir: plugin._pluginDir };
+  res.json(result);
 });
 
 app.get('/api/plugins/:pluginId/preview/*', (req, res) => {
