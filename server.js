@@ -256,6 +256,7 @@ function loadMarketplaces() {
 
       const fsComps = pluginDir ? countComponents(pluginDir) : null;
       const components = {};
+      const inlineConfig = {};
       for (const k of compKeys) {
         if (fsComps && Array.isArray(fsComps[k]) && fsComps[k].length > 0) {
           if (Array.isArray(pd[k]) && pd[k].length > 0) {
@@ -266,9 +267,18 @@ function loadMarketplaces() {
           }
         } else if (Array.isArray(pd[k]) && pd[k].length > 0) {
           components[k] = pd[k].map(p => typeof p === 'string' ? path.basename(p) : (p.name || String(p)));
+        } else if (pd[k] && typeof pd[k] === 'object') {
+          components[k] = Object.keys(pd[k]);
+          inlineConfig[k] = pd[k];
         } else if (pd[k]) {
-          components[k] = Array.isArray(pd[k]) ? [] : [String(pd[k])];
+          components[k] = [String(pd[k])];
         }
+      }
+      if (fsComps?._configFiles) components._configFiles = fsComps._configFiles;
+      if (fsComps?._readmePath) components._readmePath = fsComps._readmePath;
+      for (const k of Object.keys(inlineConfig)) {
+        if (!components._configFiles) components._configFiles = {};
+        if (!components._configFiles[k]) components._configFiles[k] = `${INLINE_PREFIX}${k}`;
       }
 
       const installedVersion = [scopeDetails.user, scopeDetails.project, scopeDetails.local]
@@ -301,6 +311,8 @@ function loadMarketplaces() {
         components,
         _pluginDir: toUnixPath(pluginDir),
         _originDir: toUnixPath(originDir),
+        _installLocation: toUnixPath(installLocation),
+        _inlineConfig: Object.keys(inlineConfig).length ? inlineConfig : null,
         _fsComps: fsComps,
         metadata: Object.fromEntries(
           Object.entries(pd).filter(([k]) => !['name', 'description', 'source', 'version', ...compKeys].includes(k))
@@ -429,6 +441,7 @@ function findFiles(dir, ext) {
 }
 
 const VIRTUAL_PREFIX = '_custom/';
+const INLINE_PREFIX = '__inline__/';
 const SCOPE_LABELS = { user: 'User Customizations', project: 'Project Customizations' };
 const EMPTY_SCOPE = { installed: false, enabled: false, version: null, installPath: null };
 
@@ -623,14 +636,21 @@ app.get('/api/plugins/:pluginId/components', (req, res) => {
   if (!plugin?._pluginDir) return res.status(404).json({ error: 'Plugin directory not found', pluginId });
 
   const comps = plugin.components || plugin._fsComps || countComponents(plugin._pluginDir, plugin.metadata);
-  const result = { ...comps, _pluginDir: plugin._pluginDir };
-  res.json(result);
+  res.json({ ...comps, _pluginDir: plugin._pluginDir });
 });
 
 app.get('/api/plugins/:pluginId/preview/*', (req, res) => {
   const pluginId = decodeURIComponent(req.params.pluginId);
   const relPath = req.params[0];
   const marketplaces = getCachedMarketplaces();
+
+  if (relPath.startsWith(INLINE_PREFIX)) {
+    const type = relPath.slice(INLINE_PREFIX.length);
+    const inline = findPlugin(pluginId, marketplaces)?._inlineConfig?.[type];
+    if (inline === undefined) return res.status(404).json({ error: 'Inline config not found' });
+    return res.json({ type: 'file', content: JSON.stringify({ [type]: inline }, null, 2), name: `${type}.json` });
+  }
+
   const pluginDir = resolvePluginDir(pluginId, marketplaces);
   if (!pluginDir) return res.status(404).json({ error: 'Plugin not found' });
 
@@ -677,7 +697,13 @@ app.post('/api/open-in-editor', (req, res) => {
   const pluginJson = path.join(pluginDir, '.claude-plugin', 'plugin.json');
   if (fs.existsSync(pluginJson)) args.push(pluginJson);
 
-  if (relativePath) {
+  if (relativePath && relativePath.startsWith(INLINE_PREFIX)) {
+    const installLocation = findPlugin(pluginId, marketplaces)?._installLocation;
+    if (installLocation) {
+      const mktJson = path.join(installLocation, '.claude-plugin', 'marketplace.json');
+      if (fs.existsSync(mktJson)) args.push(mktJson);
+    }
+  } else if (relativePath) {
     const fullPath = path.resolve(pluginDir, resolveVirtualRelPath(pluginId, relativePath));
     if (isPathAllowed(fullPath, pluginDir, pluginId)) args.push(fullPath);
   }
