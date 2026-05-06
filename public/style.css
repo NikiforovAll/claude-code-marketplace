@@ -1389,3 +1389,10 @@ kbd {
   color: var(--text-muted);
   opacity: 0.6;
 }
+
+.detail-comp-group.view-only {
+  opacity: 0.55;
+}
+.detail-comp-group.view-only:hover {
+  opacity: 0.85;
+}

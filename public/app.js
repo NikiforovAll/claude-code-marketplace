@@ -48,11 +48,14 @@ ICONS.readme = SVG(
 );
 ICONS.settings = ICONS.gear;
 ICONS.claudeMd = ICONS.readme;
+ICONS.agentsMd = ICONS.readme;
+ICONS.agentSkills = ICONS.skills;
 ICONS.openEditor =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.583 2.207a1.1 1.1 0 0 1 1.541.033l2.636 2.636a1.1 1.1 0 0 1 .033 1.541L10.68 17.53a1.1 1.1 0 0 1-.345.247l-4.56 1.903a.55.55 0 0 1-.725-.725l1.903-4.56a1.1 1.1 0 0 1 .247-.345zm.902 1.87-8.794 8.793-.946 2.268 2.268-.946 8.794-8.793z"/></svg>';
 ICONS.copyPath =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-const COMP_HAS_DIR = new Set(['skills', 'commands', 'agents']);
+const COMP_DIR_MAP = { skills: 'skills', commands: 'commands', agents: 'agents', agentSkills: '~agents' };
+const COMP_HAS_DIR = new Set(Object.keys(COMP_DIR_MAP));
 const COMP_LABELS = {
   skills: 'Skills',
   commands: 'Commands',
@@ -62,10 +65,13 @@ const COMP_LABELS = {
   lspServers: 'LSP Servers',
   settings: 'Settings',
   claudeMd: 'CLAUDE.md',
+  agentsMd: 'AGENTS.md',
+  agentSkills: 'Agent Skills (not-supported)',
   readme: 'README',
 };
 
 const VIRTUAL_ROOT_PREFIX = '~root/';
+const VIRTUAL_AGENTS_PREFIX = '~agents/';
 
 function encodePathSegments(p) {
   return p.split('/').map(encodeURIComponent).join('/');
@@ -79,6 +85,12 @@ function getContentRelativePath() {
 function claudeMdLabel(name, count) {
   if (name.startsWith(VIRTUAL_ROOT_PREFIX)) return count > 1 ? 'CLAUDE.md (project root)' : 'CLAUDE.md';
   return count > 1 ? 'CLAUDE.md (.claude/)' : name;
+}
+
+function compItemLabel(type, name, count) {
+  if (type === 'claudeMd') return claudeMdLabel(name, count);
+  if (type === 'agentsMd' && name.startsWith(VIRTUAL_ROOT_PREFIX)) return name.slice(VIRTUAL_ROOT_PREFIX.length);
+  return name;
 }
 
 function updateArrow(p) {
@@ -603,7 +615,8 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
       .map(([type, items]) => {
         const names = Array.isArray(items) ? items : [];
         const count = names.length || items;
-        let html = `<div class="detail-comp-group">
+        const groupCls = type === 'agentSkills' || type === 'agentsMd' ? ' view-only' : '';
+        let html = `<div class="detail-comp-group${groupCls}">
       <div class="detail-comp-header">
         <span class="comp-icon">${ICONS[type] || ''}</span>
         ${COMP_LABELS[type] || type}
@@ -612,7 +625,7 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
 
         if (names.length) {
           const configFile = configFiles[type];
-          const dir = COMP_HAS_DIR.has(type) ? type : null;
+          const dir = COMP_DIR_MAP[type] || null;
           html += '<div class="detail-comp-items">';
           for (const name of names) {
             const clickPath = configFile || (dir ? `${dir}/${name}` : name);
@@ -620,9 +633,10 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
             const click = hasDirAccess
               ? ` onclick="openContentModal('${escJs(pluginId)}', '${escJs(clickPath)}', '${escJs(type)}')"`
               : '';
+            const isFolder = type === 'skills' || type === 'agentSkills';
             html += `<div class="detail-comp-item${cls}"${click}>
-            <span class="icon">${type === 'skills' ? ICONS.folder : ICONS.file}</span>
-            ${esc(type === 'claudeMd' ? claudeMdLabel(name, names.length) : name)}
+            <span class="icon">${isFolder ? ICONS.folder : ICONS.file}</span>
+            ${esc(compItemLabel(type, name, names.length))}
           </div>`;
           }
           html += '</div>';
@@ -732,10 +746,12 @@ async function copyToClipboard(text, btn) {
 async function copyContentPath(event) {
   if (!_contentPluginDir) return;
   const relativePath = getContentRelativePath();
+  const parentDir = _contentPluginDir.replace(/\/[^/]+\/?$/, '');
   let full;
   if (relativePath.startsWith(VIRTUAL_ROOT_PREFIX)) {
-    const parentDir = _contentPluginDir.replace(/\/[^/]+\/?$/, '');
     full = `${parentDir}/${relativePath.slice(VIRTUAL_ROOT_PREFIX.length)}`;
+  } else if (relativePath.startsWith(VIRTUAL_AGENTS_PREFIX)) {
+    full = `${parentDir}/.agents/skills/${relativePath.slice(VIRTUAL_AGENTS_PREFIX.length)}`;
   } else {
     full = relativePath ? `${_contentPluginDir}/${relativePath}` : _contentPluginDir;
   }
@@ -798,6 +814,15 @@ async function loadContentTree(pluginId, treePath, container, depth, autoSelect)
     const data = await res.json();
 
     if (data.type === 'directory') {
+      if (!data.entries.length) {
+        container.innerHTML =
+          '<div style="color:var(--text-dim);font-size:11px;padding:8px 12px">(empty directory)</div>';
+        if (autoSelect) {
+          const codeEl = getContentCodeEl();
+          codeEl.innerHTML = '<span style="color:var(--text-dim)">No files in this directory</span>';
+        }
+        return;
+      }
       let firstFile = null;
       let preferredFile = null;
       for (const entry of data.entries) {
@@ -843,7 +868,11 @@ async function loadContentTree(pluginId, treePath, container, depth, autoSelect)
 async function loadContentFile(pluginId, filePath) {
   const codeEl = getContentCodeEl();
   const pathEl = document.getElementById('contentViewerPath');
-  pathEl.textContent = filePath.startsWith(VIRTUAL_ROOT_PREFIX) ? filePath.slice(VIRTUAL_ROOT_PREFIX.length) : filePath;
+  pathEl.textContent = filePath.startsWith(VIRTUAL_ROOT_PREFIX)
+    ? filePath.slice(VIRTUAL_ROOT_PREFIX.length)
+    : filePath.startsWith(VIRTUAL_AGENTS_PREFIX)
+      ? `.agents/skills/${filePath.slice(VIRTUAL_AGENTS_PREFIX.length)}`
+      : filePath;
   pathEl.dataset.rawPath = filePath;
   codeEl.innerHTML = '<span style="color:var(--text-dim)">Loading...</span>';
 

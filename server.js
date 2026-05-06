@@ -478,6 +478,21 @@ function rescanVirtualComponents(basePath, scope) {
   }
   if (claudeMdFiles.length) components.claudeMd = claudeMdFiles;
 
+  if (scope === 'project') {
+    const parentAgents = path.join(basePath, '..', 'AGENTS.md');
+    if (fs.existsSync(parentAgents)) components.agentsMd = ['~root/AGENTS.md'];
+  }
+
+  const agentSkillsDir = path.join(basePath, '..', '.agents', 'skills');
+  if (fs.existsSync(agentSkillsDir) && fs.statSync(agentSkillsDir).isDirectory()) {
+    try {
+      const dirs = fs.readdirSync(agentSkillsDir).filter(d => {
+        try { return fs.statSync(path.join(agentSkillsDir, d)).isDirectory(); } catch { return false; }
+      });
+      if (dirs.length) components.agentSkills = dirs;
+    } catch {}
+  }
+
   return components;
 }
 
@@ -585,6 +600,9 @@ function resolvePluginDir(fullId, marketplaces) {
 }
 
 function resolveVirtualRelPath(pluginId, relPath) {
+  if ((pluginId === '_custom/user' || pluginId === '_custom/project') && relPath.startsWith('~agents/')) {
+    return path.join('..', '.agents', 'skills', relPath.slice('~agents/'.length));
+  }
   return pluginId === '_custom/project' && relPath.startsWith('~root/')
     ? path.join('..', relPath.slice(6))
     : relPath;
@@ -592,8 +610,13 @@ function resolveVirtualRelPath(pluginId, relPath) {
 
 function isPathAllowed(fullPath, pluginDir, pluginId) {
   if (fullPath.startsWith(path.resolve(pluginDir))) return true;
+  const parent = path.resolve(pluginDir, '..');
   if (pluginId === '_custom/project') {
-    return fullPath === path.join(path.resolve(pluginDir, '..'), 'CLAUDE.md');
+    if (fullPath === path.join(parent, 'CLAUDE.md') || fullPath === path.join(parent, 'AGENTS.md')) return true;
+  }
+  if (pluginId === '_custom/user' || pluginId === '_custom/project') {
+    const agentsRoot = path.join(parent, '.agents', 'skills');
+    if (fullPath === agentsRoot || fullPath.startsWith(agentsRoot + path.sep)) return true;
   }
   return false;
 }
