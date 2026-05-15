@@ -215,7 +215,12 @@ async function loadData() {
     }
 
     renderTree();
-    if (selectedPluginId) showDetail(selectedPluginId);
+    if (selectedPluginId) {
+      showDetail(selectedPluginId);
+    } else {
+      const userCustom = marketplaces.flatMap((m) => m.plugins).find((p) => p.fullId === '_custom/user');
+      if (userCustom) showDetail('_custom/user');
+    }
 
     // Prefetch components for all plugins in background
     for (const m of marketplaces) {
@@ -1349,6 +1354,13 @@ function handleKeydown(e) {
     return;
   }
 
+  if (matchKey(e, 'u') || matchKey(e, 'p')) {
+    e.preventDefault();
+    const scope = matchKey(e, 'u') ? 'user' : 'project';
+    openCustomClaudeMd(scope);
+    return;
+  }
+
   const rows = getVisibleRows();
   const idx = getFocusedIndex(rows);
 
@@ -1409,6 +1421,19 @@ function handleKeydown(e) {
     }
     return;
   }
+}
+
+async function openCustomClaudeMd(scope) {
+  const pluginId = `_custom/${scope}`;
+  const plugin = findPlugin(pluginId);
+  if (!plugin) return;
+  const comps = (await fetchComponents(pluginId)) || {};
+  const files = comps.claudeMd;
+  if (!files?.length) return;
+  // prefer the root CLAUDE.md over the .claude/ one
+  const file = files.find((f) => !f.startsWith('~root/')) || files[0];
+  showDetail(pluginId);
+  openContentModal(pluginId, file, 'claudeMd');
 }
 
 let _helpModalHandler = null;
