@@ -38,7 +38,7 @@ npx claude-code-marketplace --port 8080
 ### Options
 
 ```
---port <number>   Custom port (default: 3457)
+--port <number>   Custom port (default: 3542)
 --project <path>  Project directory for project-scoped plugins
 --open            Open browser on start
 ```

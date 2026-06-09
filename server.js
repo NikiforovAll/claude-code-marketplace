@@ -34,7 +34,7 @@ function getArg(name) {
 
 let projectPath = getArg('project') || process.cwd();
 if (projectPath.startsWith('~')) projectPath = projectPath.replace('~', os.homedir());
-const PORT = parseInt(getArg('port') || process.env.PORT || '3457', 10);
+const PORT = parseInt(getArg('port') || process.env.PORT || '3542', 10);
 
 function toUnixPath(p) {
   return p ? p.replace(/\\/g, '/') : p;

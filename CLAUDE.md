@@ -5,7 +5,7 @@ Claude Code Marketplace — a web dashboard for browsing, installing, and managi
 ## Commands
 
 ```bash
-npm start                # Start server at http://localhost:3457
+npm start                # Start server at http://localhost:3542
 npm run dev              # Start with auto-open browser
 npm run lint             # Check with Biome
 npm run lint:fix         # Auto-fix linting issues
