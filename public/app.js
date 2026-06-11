@@ -126,6 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('refreshBtn').addEventListener('click', refresh);
   document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+  document.getElementById('themePickerBtn').addEventListener('click', toggleThemeMenu);
+  buildThemeMenu();
 
   document.getElementById('projectBtn').addEventListener('click', changeProject);
   document.getElementById('addMarketplaceBtn').addEventListener('click', openAddMarketplace);
@@ -152,6 +154,9 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     document.body.classList.add('light');
   }
+  const savedColorTheme = localStorage.getItem('color-theme');
+  if (savedColorTheme) document.body.dataset.colorTheme = savedColorTheme;
+  syncColorThemeMenu(savedColorTheme || 'ember');
   syncHljsTheme();
   updateThemeColor(savedTheme !== 'dark');
 
@@ -193,6 +198,71 @@ function toggleTheme() {
   }
   syncHljsTheme();
   updateThemeColor(!isLight);
+}
+
+const COLOR_THEMES = [
+  ['ember', 'Ember'],
+  ['gruvbox', 'Gruvbox'],
+  ['catppuccin', 'Catppuccin'],
+  ['tokyo-night', 'Tokyo Night'],
+  ['solarized', 'Solarized'],
+  ['dracula', 'Dracula'],
+  ['nord', 'Nord'],
+  ['rose-pine', 'Rosé Pine'],
+  ['everforest', 'Everforest'],
+  ['kanagawa', 'Kanagawa'],
+  ['one-dark', 'One Dark'],
+  ['night-owl', 'Night Owl'],
+  ['monokai', 'Monokai Pro'],
+  ['github', 'GitHub'],
+  ['ayu', 'Ayu'],
+  ['vitesse', 'Vitesse'],
+  ['synthwave', "Synthwave '84"],
+];
+
+// 'ember' (the :root default) has no override block — selecting it clears the attribute.
+function setColorTheme(id) {
+  if (!id || id === 'ember') {
+    delete document.body.dataset.colorTheme;
+    localStorage.removeItem('color-theme');
+  } else {
+    document.body.dataset.colorTheme = id;
+    localStorage.setItem('color-theme', id);
+  }
+  syncColorThemeMenu(id);
+}
+
+function buildThemeMenu() {
+  const menu = document.getElementById('themeMenu');
+  menu.innerHTML = COLOR_THEMES.map(
+    ([id, label]) =>
+      `<button type="button" class="theme-menu-item" data-theme-id="${id}">
+         <span class="theme-swatch theme-swatch-${id}"><i class="sw-bg"></i><i class="sw-accent"></i><i class="sw-ink"></i></span>${label}
+       </button>`,
+  ).join('');
+  // stopPropagation keeps the click from bubbling to the picker button, which would re-toggle the menu
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.theme-menu-item');
+    if (!item) return;
+    e.stopPropagation();
+    setColorTheme(item.dataset.themeId);
+    menu.classList.remove('open');
+  });
+}
+
+function toggleThemeMenu(e) {
+  e?.stopPropagation();
+  const menu = document.getElementById('themeMenu');
+  const open = menu.classList.toggle('open');
+  if (open) {
+    document.addEventListener('click', () => menu.classList.remove('open'), { once: true });
+  }
+}
+
+function syncColorThemeMenu(id) {
+  document.querySelectorAll('.theme-menu-item').forEach((el) => {
+    el.classList.toggle('on', el.dataset.themeId === (id || 'ember'));
+  });
 }
 
 async function loadProject() {
@@ -1523,21 +1593,35 @@ function hubNavigate(app, url) {
 
 (function initHubTheme() {
   const getTheme = () => (document.body.classList.contains('light') ? 'light' : 'dark');
+  const getColorTheme = () => document.body.dataset.colorTheme || 'ember';
   const hubOrigin = () => (window.__HUB__?.url ? new URL(window.__HUB__.url).origin : null);
+  // lastTheme/lastColorTheme are updated synchronously when applying a hub
+  // message, so the (async) observer sees no diff and doesn't echo it back.
   let lastTheme = getTheme();
+  let lastColorTheme = getColorTheme();
   window.addEventListener('message', (e) => {
     if (e.source !== window.parent || e.origin !== hubOrigin()) return;
     if (e.data?.type !== 'hub:theme') return;
-    if (getTheme() === e.data.theme) return;
-    window.toggleTheme();
-    lastTheme = getTheme();
+    if (typeof e.data.colorTheme === 'string' && e.data.colorTheme !== getColorTheme()) {
+      setColorTheme(e.data.colorTheme);
+      lastColorTheme = getColorTheme();
+    }
+    if (getTheme() !== e.data.theme) {
+      window.toggleTheme();
+      lastTheme = getTheme();
+    }
   });
   new MutationObserver(() => {
     const t = getTheme();
-    if (t === lastTheme) return;
+    const ct = getColorTheme();
+    if (t === lastTheme && ct === lastColorTheme) return;
     lastTheme = t;
+    lastColorTheme = ct;
     const origin = hubOrigin();
-    if (origin) window.parent.postMessage({ type: 'hub:theme', theme: t }, origin);
-  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    if (origin) window.parent.postMessage({ type: 'hub:theme', theme: t, colorTheme: ct }, origin);
+  }).observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class', 'data-color-theme'],
+  });
 })();
 // #endregion HUB_INTEGRATION
