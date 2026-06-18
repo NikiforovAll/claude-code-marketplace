@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cc-marketplace-v1';
+const CACHE_NAME = 'cc-marketplace-v2';
 const PRECACHE = ['/', '/style.css', '/app.js'];
 
 self.addEventListener('install', (e) => {

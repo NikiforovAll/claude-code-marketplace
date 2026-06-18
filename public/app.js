@@ -1356,6 +1356,11 @@ function setFocusedRow(index, rows) {
   _focusedRowEl = row;
 }
 
+function getFocusedPluginId() {
+  if (_focusedRowEl?.dataset.rowType === 'plugin') return _focusedRowEl.dataset.rowId;
+  return null;
+}
+
 function getFocusedIndex(rows) {
   if (!focusedRowId) return -1;
   return rows.findIndex((r) => r.dataset.rowId === focusedRowId);
@@ -1408,7 +1413,13 @@ function handleKeydown(e) {
 
   if (matchKey(e, 'e')) {
     e.preventDefault();
-    toggleExpandAll();
+    const id = selectedPluginId || getFocusedPluginId();
+    if (id) {
+      openFolderInEditor({ pluginId: id });
+      toast('Opening in editor…', 'info');
+    } else {
+      toast('Select a plugin first', 'info');
+    }
     return;
   }
 
