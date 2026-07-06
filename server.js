@@ -14,7 +14,13 @@ app.get('/hub-config', (_req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+function getClaudeDir() {
+  const dir = getArg('dir') || process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_DIR;
+  if (dir) return dir.startsWith('~') ? dir.replace('~', os.homedir()) : dir;
+  return path.join(os.homedir(), '.claude');
+}
+
+const CLAUDE_DIR = getClaudeDir();
 const PLUGINS_DIR = path.join(CLAUDE_DIR, 'plugins');
 
 let _marketplaceCache = null;
