@@ -54,6 +54,9 @@ ICONS.openEditor =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.583 2.207a1.1 1.1 0 0 1 1.541.033l2.636 2.636a1.1 1.1 0 0 1 .033 1.541L10.68 17.53a1.1 1.1 0 0 1-.345.247l-4.56 1.903a.55.55 0 0 1-.725-.725l1.903-4.56a1.1 1.1 0 0 1 .247-.345zm.902 1.87-8.794 8.793-.946 2.268 2.268-.946 8.794-8.793z"/></svg>';
 ICONS.copyPath =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+ICONS.trash = SVG(
+  '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+);
 const COMP_DIR_MAP = { skills: 'skills', commands: 'commands', agents: 'agents', agentSkills: '~agents' };
 const COMP_HAS_DIR = new Set(Object.keys(COMP_DIR_MAP));
 const COMP_LABELS = {
@@ -285,6 +288,7 @@ async function loadData() {
     }
 
     renderTree();
+    if (document.getElementById('addMarketplaceModal').classList.contains('open')) renderMarketplaceList();
     if (selectedPluginId) {
       showDetail(selectedPluginId);
     } else {
@@ -993,7 +997,7 @@ function showMarketplaceDetail(name) {
   const installed = m.plugins.filter((p) => p.isInstalled).length;
   const total = m.plugins.length;
   const srcType = m.source.type || 'unknown';
-  const srcDetail = m.source.repo || m.source.path || m.source.url || '';
+  const srcDetail = sourceDetail(m);
   const updated = m.lastUpdated ? timeAgo(new Date(m.lastUpdated)) : 'unknown';
 
   panel.innerHTML = `
@@ -1223,6 +1227,10 @@ function filterPlugins(plugins) {
   return result;
 }
 
+function sourceDetail(m) {
+  return m.source?.repo || m.source?.path || m.source?.url || '';
+}
+
 function sourceBadge(type) {
   if (type === 'github') return '<span class="badge badge-github">GitHub</span>';
   if (type === 'directory') return '<span class="badge badge-directory">Local</span>';
@@ -1290,8 +1298,46 @@ function closeModal(id) {
 
 function openAddMarketplace() {
   document.getElementById('marketplaceSource').value = '';
+  renderMarketplaceList();
   document.getElementById('addMarketplaceModal').classList.add('open');
   setTimeout(() => document.getElementById('marketplaceSource').focus(), 100);
+}
+
+function renderMarketplaceList() {
+  const container = document.getElementById('marketplaceList');
+  const real = marketplaces.filter((m) => !m.isVirtual);
+  if (!real.length) {
+    container.innerHTML = '<div class="mkt-list-empty">No marketplaces registered</div>';
+    return;
+  }
+  container.innerHTML = real
+    .map((m) => {
+      const src = sourceDetail(m);
+      const installed = m.plugins.filter((p) => p.isInstalled).length;
+      return `<div class="mkt-list-item" onclick="openMarketplaceFromList('${escJs(m.name)}')">
+        <span class="tree-icon">${ICONS.marketplace}</span>
+        <div class="mkt-list-info">
+          <div class="mkt-list-name">${esc(m.name)} ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</div>
+          <div class="mkt-list-src" title="${esc(src)}">${esc(src)}</div>
+        </div>
+        ${sourceBadge(m.source?.type)}
+        <span class="mkt-list-count" title="${installed} installed of ${m.plugins.length} plugins">${installed}/${m.plugins.length}</span>
+        <button class="modal-action-btn mkt-list-remove" title="Remove marketplace" onclick="event.stopPropagation(); removeMarketplace('${escJs(m.name)}', this)">${ICONS.trash}</button>
+      </div>`;
+    })
+    .join('');
+}
+
+function openMarketplaceFromList(name) {
+  closeModal('addMarketplaceModal');
+  showMarketplaceDetail(name);
+}
+
+async function removeMarketplace(name, btn) {
+  if (!confirm(`Remove marketplace "${name}"?`)) return;
+  btn.disabled = true;
+  await postAndReload('/api/marketplace/remove', { name }, 'remove');
+  btn.disabled = false;
 }
 
 async function submitAddMarketplace() {
@@ -1311,7 +1357,7 @@ async function submitAddMarketplace() {
       toast(data.error || 'Failed to add marketplace', 'error');
     } else {
       toast('Marketplace added', 'success');
-      closeModal('addMarketplaceModal');
+      document.getElementById('marketplaceSource').value = '';
       await loadData();
     }
   } catch (err) {

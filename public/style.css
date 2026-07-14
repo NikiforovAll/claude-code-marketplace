@@ -1276,6 +1276,85 @@ body.light .scope-toggle.local {
   margin-top: 16px;
 }
 
+/* === MARKETPLACES MODAL === */
+
+.marketplaces-modal {
+  width: 720px;
+  max-width: min(90vw, 720px);
+}
+.marketplaces-modal .modal-body {
+  padding: 20px;
+}
+.marketplaces-modal .modal-field:last-child {
+  margin-bottom: 0;
+}
+.mkt-add-row {
+  display: flex;
+  gap: 8px;
+}
+.mkt-add-row input[type='text'] {
+  flex: 1;
+}
+.mkt-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+}
+.mkt-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.mkt-list-item:hover {
+  background: var(--bg-hover);
+}
+.mkt-list-info {
+  flex: 1;
+  min-width: 0;
+}
+.mkt-list-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+.mkt-list-src {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mkt-list-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+.mkt-list-remove {
+  flex-shrink: 0;
+}
+.mkt-list-remove:hover {
+  color: var(--error);
+  background: var(--error-dim);
+}
+.mkt-list-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mkt-list-empty {
+  padding: 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 /* === RECENT PROJECTS === */
 
 .recent-projects-label {

@@ -39,7 +39,7 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
       <span id="projectPath"></span>
     </div>
-    <button class="topbar-btn" id="addMarketplaceBtn" title="Add marketplace">
+    <button class="topbar-btn" id="addMarketplaceBtn" title="Manage marketplaces">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Add
     </button>
@@ -80,22 +80,25 @@
 
   <div class="toast-container" id="toast"></div>
 
-  <!-- Add marketplace modal -->
+  <!-- Marketplaces modal -->
   <div class="modal-overlay" id="addMarketplaceModal">
-    <div class="modal">
+    <div class="modal marketplaces-modal">
       <div class="modal-header">
-        <h3>Add Marketplace</h3>
+        <h3>Marketplaces</h3>
         <button class="modal-close" onclick="closeModal('addMarketplaceModal')">&#10005;</button>
       </div>
       <div class="modal-body">
         <div class="modal-field">
-          <label>Source</label>
-          <input type="text" id="marketplaceSource" placeholder="github:owner/repo or /path/to/directory" autocomplete="off">
+          <label>Add Marketplace</label>
+          <div class="mkt-add-row">
+            <input type="text" id="marketplaceSource" placeholder="github:owner/repo or /path/to/directory" autocomplete="off">
+            <button class="action-btn primary" id="addMarketplaceSubmit" onclick="submitAddMarketplace()">Add</button>
+          </div>
           <span class="modal-hint">GitHub repo (e.g. anthropics/skills), git URL (e.g. https://github.com/org/repo.git), or local directory path</span>
         </div>
-        <div class="modal-actions">
-          <button class="action-btn" onclick="closeModal('addMarketplaceModal')">Cancel</button>
-          <button class="action-btn primary" id="addMarketplaceSubmit" onclick="submitAddMarketplace()">Add</button>
+        <div class="modal-field">
+          <label>Registered</label>
+          <div class="mkt-list" id="marketplaceList"></div>
         </div>
       </div>
     </div>
