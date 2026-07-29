@@ -363,9 +363,13 @@ function countComponents(pluginDir, meta = {}) {
         if (fs.existsSync(path.join(skillsDir, 'SKILL.md'))) {
           result.skills.push(path.basename(skillsDir));
         } else {
-          const dirs = fs.readdirSync(skillsDir).filter(d =>
-            fs.statSync(path.join(skillsDir, d)).isDirectory()
-          );
+          // A directory is only a skill if it carries a SKILL.md
+          const dirs = fs.readdirSync(skillsDir).filter(d => {
+            try {
+              return fs.statSync(path.join(skillsDir, d)).isDirectory()
+                && fs.existsSync(path.join(skillsDir, d, 'SKILL.md'));
+            } catch { return false; }
+          });
           result.skills.push(...dirs);
         }
       } catch {}
@@ -493,7 +497,10 @@ function rescanVirtualComponents(basePath, scope) {
   if (fs.existsSync(agentSkillsDir) && fs.statSync(agentSkillsDir).isDirectory()) {
     try {
       const dirs = fs.readdirSync(agentSkillsDir).filter(d => {
-        try { return fs.statSync(path.join(agentSkillsDir, d)).isDirectory(); } catch { return false; }
+        try {
+          return fs.statSync(path.join(agentSkillsDir, d)).isDirectory()
+            && fs.existsSync(path.join(agentSkillsDir, d, 'SKILL.md'));
+        } catch { return false; }
       });
       if (dirs.length) components.agentSkills = dirs;
     } catch {}
