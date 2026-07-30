@@ -740,8 +740,11 @@ app.post('/api/open-in-editor', (req, res) => {
       if (fs.existsSync(mktJson)) args.push(mktJson);
     }
   } else if (relativePath) {
-    const fullPath = path.resolve(pluginDir, resolveVirtualRelPath(pluginId, relativePath));
-    if (isPathAllowed(fullPath, pluginDir, pluginId)) args.push(fullPath);
+    let fullPath = path.resolve(pluginDir, resolveVirtualRelPath(pluginId, relativePath));
+    if (isPathAllowed(fullPath, pluginDir, pluginId)) {
+      if (!fs.existsSync(fullPath) && fs.existsSync(fullPath + '.md')) fullPath += '.md';
+      args.push(fullPath);
+    }
   }
 
   openVSCode(args, res);
