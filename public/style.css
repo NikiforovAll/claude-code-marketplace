@@ -1522,7 +1522,7 @@ kbd {
   padding: 12px 16px;
   overflow: auto;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--text-secondary);
   background: var(--bg-deep);
