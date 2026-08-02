@@ -38,8 +38,12 @@ function getArg(name) {
   return process.argv[idx + 1] || null;
 }
 
-let projectPath = getArg('project') || process.cwd();
+const projectArg = getArg('project');
+let projectPath = projectArg || process.cwd();
 if (projectPath.startsWith('~')) projectPath = projectPath.replace('~', os.homedir());
+// Lets the client tell a deliberate --project from the cwd fallback: only the fallback may be
+// replaced by the browser's last-used project at boot.
+let projectExplicit = Boolean(projectArg);
 const PORT = parseInt(getArg('port') || process.env.PORT || '3542', 10);
 
 function toUnixPath(p) {
@@ -769,7 +773,7 @@ app.post('/api/open-folder-in-editor', (req, res) => {
 });
 
 app.get('/api/project', (req, res) => {
-  res.json({ path: projectPath });
+  res.json({ path: projectPath, explicit: projectExplicit });
 });
 
 app.put('/api/project', (req, res) => {
@@ -779,6 +783,7 @@ app.put('/api/project', (req, res) => {
   const resolved = path.resolve(expanded);
   if (!fs.existsSync(resolved)) return res.status(400).json({ error: 'Directory does not exist' });
   projectPath = resolved;
+  projectExplicit = false;
   invalidateCache();
   res.json({ path: projectPath });
 });

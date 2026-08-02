@@ -111,8 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('contentOpenEditor').innerHTML = ICONS.openEditor;
   document.getElementById('contentCopyPath').innerHTML = ICONS.copyPath;
   restoreAppState();
-  loadProject();
-  loadData();
+  initProjectScope();
   initSidebarResize();
 
   let searchTimer;
@@ -279,16 +278,16 @@ async function putProject(dirPath) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `${res.status}`);
   }
+  const { path } = await res.json();
+  // Only a switch feeds the recents list — never the server's reported path, which may be its cwd
+  // fallback (the hub's own directory) rather than anything the user picked.
+  saveRecentProject(path);
+  return path;
 }
 
-async function loadProject() {
-  try {
-    const res = await fetch('/api/project');
-    const data = await res.json();
-    document.getElementById('projectPath').textContent = shortenPath(data.path);
-    document.getElementById('projectBtn').title = data.path;
-    saveRecentProject(data.path);
-  } catch {}
+function renderProjectPath(dirPath) {
+  document.getElementById('projectPath').textContent = shortenPath(dirPath);
+  document.getElementById('projectBtn').title = dirPath;
 }
 
 async function loadData() {
@@ -397,9 +396,10 @@ async function submitProjectPicker() {
   btn.disabled = true;
   btn.textContent = 'Switching...';
   try {
-    await putProject(dirPath);
+    lastAppliedProject = await putProject(dirPath);
     closeModal('projectPickerModal');
-    await Promise.all([loadProject(), loadData()]);
+    renderProjectPath(lastAppliedProject);
+    await loadData();
     toast('Project switched', 'success');
   } catch (err) {
     toast(err.message, 'error');
@@ -1141,29 +1141,39 @@ function restoreAppState() {
   if (params.has('plugin')) {
     selectedPluginId = params.get('plugin');
   }
-  if (params.has('project')) {
-    const projectPath = params.get('project');
-    fetch('/api/project', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: projectPath }),
-    })
-      .then((r) => {
-        if (r.ok) {
-          loadProject();
-          loadData();
-        }
-      })
-      .catch(() => {});
-    const cleanParams = new URLSearchParams(window.location.search);
-    cleanParams.delete('project');
-    const qs = cleanParams.toString();
-    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
-  }
   try {
     const saved = JSON.parse(localStorage.getItem('expandedNodes') || '[]');
     saved.forEach((n) => expandedNodes.add(n));
   } catch {}
+}
+
+// Without a --project flag the server falls back to its own cwd, which under the hub is the hub's
+// directory and not anything the user picked. Resolve the intended scope before the first load.
+async function initProjectScope() {
+  const fromUrl = new URLSearchParams(window.location.search).get('project');
+  let { path: current, explicit } = await (await fetch('/api/project')).json();
+  // A hub-pushed project outranks the stored recent: the hub posts on iframe load, so hub:project
+  // can land before or during this block.
+  const desired = fromUrl || hubProjectPath || (explicit ? null : getRecentProjects()[0]);
+  if (desired && desired !== current) {
+    try {
+      current = await putProject(desired);
+    } catch (err) {
+      if (fromUrl) toast(err.message, 'error');
+    }
+  }
+  // A push that arrived while the PUT above was in flight must still win.
+  if (hubProjectPath && hubProjectPath !== current) {
+    try {
+      current = await putProject(hubProjectPath);
+    } catch {}
+  }
+  // Tells the hub shim the server already holds this project, so its post-load re-post doesn't
+  // repeat the switch and the full reload that follows it.
+  lastAppliedProject = current;
+  if (fromUrl) updateUrl();
+  renderProjectPath(current);
+  await loadData();
 }
 
 async function fetchComponents(pluginId) {
@@ -1697,21 +1707,28 @@ const hubOrigin = () => (window.__HUB__?.url ? new URL(window.__HUB__.url).origi
   });
 })();
 
+// Set synchronously when the hub pushes a project, so the boot restore in initProjectScope can't
+// let a stale localStorage recent win the race against the hub's choice.
+let hubProjectPath = null;
+// Shared with initProjectScope so a boot restore and a hub push never apply the same project twice.
+let lastAppliedProject = null;
+
 (function initHubProject() {
-  let lastApplied = null;
   window.addEventListener('message', async (e) => {
     if (e.source !== window.parent || e.origin !== hubOrigin()) return;
     if (e.data?.type !== 'hub:project') return;
     const dirPath = e.data.project;
+    if (typeof dirPath !== 'string' || !dirPath) return;
+    hubProjectPath = dirPath;
     // Dedupes against the last applied value, not just an in-flight one: the hub re-posts on
     // every iframe load, so without this each load would PUT and reload twice.
-    if (typeof dirPath !== 'string' || !dirPath || lastApplied === dirPath) return;
-    lastApplied = dirPath;
+    if (lastAppliedProject === dirPath) return;
+    lastAppliedProject = dirPath;
     try {
-      await putProject(dirPath);
-      await Promise.all([loadProject(), loadData()]);
+      renderProjectPath(await putProject(dirPath));
+      await loadData();
     } catch (err) {
-      lastApplied = null;
+      lastAppliedProject = null;
       console.warn('hub:project failed:', err.message);
     }
   });
