@@ -1494,10 +1494,10 @@ function handleKeydown(e) {
     return;
   }
 
-  if (matchKey(e, 'u') || matchKey(e, 'p')) {
+  // Shift-modified on purpose: plain u/p collide with Vimium-style extension bindings.
+  if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'U' || e.key === 'P')) {
     e.preventDefault();
-    const scope = matchKey(e, 'u') ? 'user' : 'project';
-    openCustomClaudeMd(scope);
+    openCustomClaudeMd(e.key === 'U' ? 'user' : 'project');
     return;
   }
 
