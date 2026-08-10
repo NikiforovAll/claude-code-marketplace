@@ -3,9 +3,18 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { execFile } = require('child_process');
+const { openInEditor, execNoShell } = require('./lib/open-editor');
+const { createNetGuard } = require('./lib/net-guard');
+const { isContainedAny } = require('./lib/contain');
 
 const app = express();
+
+// Mounted before express.json() so a rejected request never buffers a body.
+const net = createNetGuard({ appName: 'Claude Code Marketplace' });
+app.use(net.hostGuard);
+app.use(net.frameGuard);
+app.use(net.originGuard);
+
 app.use(express.json());
 
 app.get('/hub-config', (_req, res) => {
@@ -626,16 +635,19 @@ function resolveVirtualRelPath(pluginId, relPath) {
 }
 
 function isPathAllowed(fullPath, pluginDir, pluginId) {
-  if (fullPath.startsWith(path.resolve(pluginDir))) return true;
+  // isContainedAny rather than a chain of isContained calls: it canonicalises
+  // fullPath once instead of once per root, and this runs per preview request.
   const parent = path.resolve(pluginDir, '..');
+  const roots = [pluginDir];
+  // Containment rather than a string compare: the plain compare missed a path that
+  // reaches the same file through a symlink or differing Windows casing.
   if (pluginId === '_custom/project') {
-    if (fullPath === path.join(parent, 'CLAUDE.md') || fullPath === path.join(parent, 'AGENTS.md')) return true;
+    roots.push(path.join(parent, 'CLAUDE.md'), path.join(parent, 'AGENTS.md'));
   }
   if (pluginId === '_custom/user' || pluginId === '_custom/project') {
-    const agentsRoot = path.join(parent, '.agents', 'skills');
-    if (fullPath === agentsRoot || fullPath.startsWith(agentsRoot + path.sep)) return true;
+    roots.push(path.join(parent, '.agents', 'skills'));
   }
-  return false;
+  return isContainedAny(fullPath, roots);
 }
 
 // --- API Routes ---
@@ -645,7 +657,7 @@ app.get('/api/marketplaces', (req, res) => {
   try {
     res.json(getCachedMarketplaces());
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -718,10 +730,12 @@ app.get('/api/plugins/:pluginId/preview/*', (req, res) => {
 });
 
 function openVSCode(args, res) {
-  execFile('code', args, { shell: true }, (err) => {
-    if (err) return res.status(500).json({ error: 'Failed to open editor' });
+  try {
+    openInEditor(args);
     res.json({ ok: true });
-  });
+  } catch (err) {
+    sendError(res, err);
+  }
 }
 
 app.post('/api/open-in-editor', (req, res) => {
@@ -732,7 +746,7 @@ app.post('/api/open-in-editor', (req, res) => {
   const pluginDir = resolvePluginDir(pluginId, marketplaces);
   if (!pluginDir) return res.status(404).json({ error: 'Plugin not found' });
 
-  const args = ['-n', pluginDir];
+  const args = [pluginDir];
 
   const pluginJson = path.join(pluginDir, '.claude-plugin', 'plugin.json');
   if (fs.existsSync(pluginJson)) args.push(pluginJson);
@@ -745,10 +759,13 @@ app.post('/api/open-in-editor', (req, res) => {
     }
   } else if (relativePath) {
     let fullPath = path.resolve(pluginDir, resolveVirtualRelPath(pluginId, relativePath));
-    if (isPathAllowed(fullPath, pluginDir, pluginId)) {
-      if (!fs.existsSync(fullPath) && fs.existsSync(fullPath + '.md')) fullPath += '.md';
-      args.push(fullPath);
+    // Previously a rejected path was dropped silently and the editor still opened
+    // on the plugin folder, so a traversal attempt looked like success.
+    if (!isPathAllowed(fullPath, pluginDir, pluginId)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
+    if (!fs.existsSync(fullPath) && fs.existsSync(fullPath + '.md')) fullPath += '.md';
+    args.push(fullPath);
   }
 
   openVSCode(args, res);
@@ -769,7 +786,7 @@ app.post('/api/open-folder-in-editor', (req, res) => {
 
   if (!folder) return res.status(404).json({ error: 'Directory not found' });
 
-  openVSCode(['-n', folder], res);
+  openVSCode([folder], res);
 });
 
 app.get('/api/project', (req, res) => {
@@ -781,7 +798,9 @@ app.put('/api/project', (req, res) => {
   if (!newPath) return res.status(400).json({ error: 'path required' });
   const expanded = newPath.startsWith('~') ? newPath.replace('~', os.homedir()) : newPath;
   const resolved = path.resolve(expanded);
-  if (!fs.existsSync(resolved)) return res.status(400).json({ error: 'Directory does not exist' });
+  let isDir = false;
+  try { isDir = fs.statSync(resolved).isDirectory(); } catch { /* reported below */ }
+  if (!isDir) return res.status(400).json({ error: 'Directory does not exist' });
   projectPath = resolved;
   projectExplicit = false;
   invalidateCache();
@@ -793,13 +812,27 @@ app.post('/api/refresh', (req, res) => {
   res.json({ ok: true });
 });
 
-function runClaudePlugin(args) {
-  return new Promise((resolve, reject) => {
-    execFile('claude', ['plugin', ...args], { timeout: 30000, shell: true, cwd: projectPath || undefined }, (err, stdout, stderr) => {
-      if (err) return reject(new Error(stderr || err.message));
-      resolve(stdout.trim());
-    });
-  });
+// Flags runClaudePlugin is allowed to forward. Enforced here rather than trusting
+// each route to validate, so a future route cannot reach the CLI with an operand
+// that git-style flag parsing would read as an option.
+const PLUGIN_FLAGS = new Set(['--scope']);
+
+async function runClaudePlugin(args) {
+  for (const arg of args) {
+    if (typeof arg !== 'string' || !arg) throw badRequest('Invalid argument');
+    if (arg.startsWith('-') && !PLUGIN_FLAGS.has(arg)) throw badRequest(`Unexpected option: ${arg}`);
+  }
+  // cwd is re-checked here rather than trusting the value PUT /api/project
+  // validated earlier — the directory can be removed or replaced in between.
+  const cwd = isExistingDir(projectPath) ? projectPath : undefined;
+  const { stdout } = await execNoShell('claude', ['plugin', ...args], { timeout: 30000, cwd });
+  return stdout.trim();
+}
+
+const { assertPluginId, assertName, assertScope, assertSource, badRequest, isExistingDir } = require('./lib/validate');
+
+function sendError(res, err) {
+  res.status(err.status || 500).json({ error: err.message });
 }
 
 function rejectVirtual(pluginId, res) {
@@ -810,136 +843,60 @@ function rejectVirtual(pluginId, res) {
   return false;
 }
 
-app.post('/api/plugins/install', async (req, res) => {
-  const { pluginId, scope } = req.body;
-  if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
-  if (rejectVirtual(pluginId, res)) return;
-  try {
-    const args = ['install', pluginId];
-    if (scope) args.push('--scope', scope);
-    const output = await runClaudePlugin(args);
-    invalidateCache();
-    res.json({ ok: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// install/uninstall/enable/disable/update differ only by the verb, so they share
+// one handler — a per-route copy is how /api/plugins/update ended up missing its
+// rejectVirtual check.
+for (const verb of ['install', 'uninstall', 'enable', 'disable', 'update']) {
+  app.post(`/api/plugins/${verb}`, async (req, res) => {
+    const { pluginId, scope } = req.body;
+    if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
+    if (rejectVirtual(pluginId, res)) return;
+    try {
+      const args = [verb, assertPluginId(pluginId)];
+      const validScope = assertScope(scope);
+      if (validScope) args.push('--scope', validScope);
+      const output = await runClaudePlugin(args);
+      invalidateCache();
+      res.json({ ok: true, output });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+}
 
-app.post('/api/plugins/uninstall', async (req, res) => {
-  const { pluginId, scope } = req.body;
-  if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
-  if (rejectVirtual(pluginId, res)) return;
-  try {
-    const args = ['uninstall', pluginId];
-    if (scope) args.push('--scope', scope);
-    const output = await runClaudePlugin(args);
-    invalidateCache();
-    res.json({ ok: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/plugins/enable', async (req, res) => {
-  const { pluginId, scope } = req.body;
-  if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
-  if (rejectVirtual(pluginId, res)) return;
-  try {
-    const args = ['enable', pluginId];
-    if (scope) args.push('--scope', scope);
-    const output = await runClaudePlugin(args);
-    invalidateCache();
-    res.json({ ok: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/plugins/disable', async (req, res) => {
-  const { pluginId, scope } = req.body;
-  if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
-  if (rejectVirtual(pluginId, res)) return;
-  try {
-    const args = ['disable', pluginId];
-    if (scope) args.push('--scope', scope);
-    const output = await runClaudePlugin(args);
-    invalidateCache();
-    res.json({ ok: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/plugins/update', async (req, res) => {
-  const { pluginId, scope } = req.body;
-  if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
-  try {
-    const args = ['update', pluginId];
-    if (scope) args.push('--scope', scope);
-    const output = await runClaudePlugin(args);
-    invalidateCache();
-    res.json({ ok: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/marketplace/add', async (req, res) => {
-  const { source } = req.body;
-  if (!source) return res.status(400).json({ error: 'source required' });
-  try {
-    const output = await runClaudePlugin(['marketplace', 'add', source]);
-    invalidateCache();
-    res.json({ ok: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/marketplace/remove', async (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: 'name required' });
-  try {
-    const output = await runClaudePlugin(['marketplace', 'remove', name]);
-    invalidateCache();
-    res.json({ ok: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/marketplace/update', async (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: 'name required' });
-  try {
-    const output = await runClaudePlugin(['marketplace', 'update', name]);
-    invalidateCache();
-    res.json({ ok: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// add takes a source (owner/repo, git URL or local dir); remove and update take a
+// marketplace name. Otherwise identical.
+for (const [verb, field, assertArg] of [['add', 'source', assertSource], ['remove', 'name', assertName], ['update', 'name', assertName]]) {
+  app.post(`/api/marketplace/${verb}`, async (req, res) => {
+    const value = req.body[field];
+    if (!value) return res.status(400).json({ error: `${field} required` });
+    try {
+      const output = await runClaudePlugin(['marketplace', verb, assertArg(value)]);
+      invalidateCache();
+      res.json({ ok: true, output });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+}
 
 // --- Start ---
 
-const server = app.listen(PORT, () => {
-  const actual = server.address().port;
+const onReady = (actual) => {
   console.log(`Claude Code Marketplace running at http://localhost:${actual}`);
+  const warning = net.exposureWarning();
+  if (warning) console.log(warning);
   if (process.argv.includes('--open')) {
     import('open').then(m => m.default(`http://localhost:${actual}`));
   }
-});
+};
+
+const server = net.listenLoopback(app, PORT, onReady);
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.log(`Port ${PORT} in use, trying random port...`);
-    const fallback = app.listen(0, () => {
-      const actual = fallback.address().port;
-      console.log(`Claude Code Marketplace running at http://localhost:${actual}`);
-      if (process.argv.includes('--open')) {
-        import('open').then(m => m.default(`http://localhost:${actual}`));
-      }
-    });
+    net.listenLoopback(app, 0, onReady);
   } else {
     throw err;
   }

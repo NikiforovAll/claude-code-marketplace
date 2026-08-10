@@ -362,16 +362,14 @@ function renderRecentProjects() {
     container.innerHTML = '';
     return;
   }
-  const escAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const escJs = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   container.innerHTML =
     '<div class="recent-projects-label">Recent</div>' +
     recent
       .map(
         (p) =>
-          `<div class="recent-project-item" onclick="selectRecentProject('${escJs(p)}')">` +
-          `<span>${escAttr(p)}</span>` +
-          `<button class="recent-project-remove" onclick="removeRecentProject('${escJs(p)}', event)" title="Remove">&#10005;</button>` +
+          `<div class="recent-project-item" onclick="selectRecentProject('${escAttrJs(p)}')">` +
+          `<span>${esc(p)}</span>` +
+          `<button class="recent-project-remove" onclick="removeRecentProject('${escAttrJs(p)}', event)" title="Remove">&#10005;</button>` +
           `</div>`,
       )
       .join('');
@@ -440,7 +438,7 @@ function renderTree() {
     const mIcon = m.isVirtual ? ICONS.gear : ICONS.marketplace;
     const kebabBtn = m.isVirtual
       ? ''
-      : `<button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${esc(m.name)}')" title="Marketplace info">${ICONS.kebab}</button>`;
+      : `<button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${escAttrJs(m.name)}')" title="Marketplace info">${ICONS.kebab}</button>`;
 
     html += `<div class="tree-row marketplace-row${m.isVirtual ? ' virtual' : ''}" data-row-type="marketplace" data-row-id="m_${mid}" onclick="toggleChildren('m_${mid}')">
       <span class="tree-chevron${mExpanded ? ' expanded' : ''}" id="chev_m_${mid}">\u25B6</span>
@@ -486,7 +484,7 @@ function renderPluginRow(p) {
 
   const desc = `<span class="tree-desc-inline">${p.description ? esc(p.description) : ''}</span>`;
 
-  const html = `<div class="tree-row${selected}${virtualCls}" data-row-type="plugin" data-row-id="${esc(p.fullId)}" onclick="showDetail('${esc(p.fullId)}')">
+  const html = `<div class="tree-row${selected}${virtualCls}" data-row-type="plugin" data-row-id="${esc(p.fullId)}" onclick="showDetail('${escAttrJs(p.fullId)}')">
     <span class="tree-indent" style="width:40px"></span>
     <span class="tree-icon">${icon}</span>
     <span class="tree-label">${esc(p.name)} ${ver} ${updateIndicator}</span>
@@ -514,7 +512,7 @@ function renderScopeToggles(plugin) {
       } else {
         title = `${s}: not installed`;
       }
-      return `<div class="${cls}" title="${title}" onclick="event.stopPropagation(); scopeAction('${esc(plugin.fullId)}', '${s}')">${s[0].toUpperCase()}</div>`;
+      return `<div class="${cls}" title="${title}" onclick="event.stopPropagation(); scopeAction('${escAttrJs(plugin.fullId)}', '${s}')">${s[0].toUpperCase()}</div>`;
     })
     .join('');
   return `<div class="scope-toggles">${toggles}</div>`;
@@ -555,7 +553,7 @@ async function showDetail(pluginId) {
   const updateBanner = plugin.hasUpdate
     ? `<div class="update-banner">
         <span>Update available: <strong>v${esc(plugin.version)}</strong> \u2192 <strong>v${esc(plugin.availableVersion)}</strong></span>
-        <button class="action-btn primary" onclick="runAction('update', '${esc(plugin.fullId)}')">Update Plugin</button>
+        <button class="action-btn primary" onclick="runAction('update', '${escAttrJs(plugin.fullId)}')">Update Plugin</button>
       </div>`
     : '';
 
@@ -582,7 +580,7 @@ async function showDetail(pluginId) {
     <div class="detail-header">
       <h3>${headerIcon} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
-        ${plugin._pluginDir ? `<button class="modal-action-btn" title="${esc(plugin._pluginDir)}" onclick="copyPluginPath('${escJs(plugin._pluginDir)}', event)">${ICONS.copyPath}</button><button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({pluginId:'${esc(plugin.fullId)}',event})">${ICONS.openEditor}</button>` : ''}
+        ${plugin._pluginDir ? `<button class="modal-action-btn" title="${esc(plugin._pluginDir)}" onclick="copyPluginPath('${escAttrJs(plugin._pluginDir)}', event)">${ICONS.copyPath}</button><button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({pluginId:'${escAttrJs(plugin.fullId)}',event})">${ICONS.openEditor}</button>` : ''}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
       </div>
     </div>
@@ -617,18 +615,18 @@ function renderScopeMatrix(plugin) {
       if (d.installed && d.enabled) {
         status = `Enabled${d.version ? ` \u00B7 v${esc(d.version)}` : ''}`;
         actions = `
-        <button class="action-btn" onclick="runAction('disable', '${esc(plugin.fullId)}', '${s}')">Disable</button>
-        <button class="action-btn danger" onclick="runAction('uninstall', '${esc(plugin.fullId)}', '${s}')">Remove</button>
+        <button class="action-btn" onclick="runAction('disable', '${escAttrJs(plugin.fullId)}', '${s}')">Disable</button>
+        <button class="action-btn danger" onclick="runAction('uninstall', '${escAttrJs(plugin.fullId)}', '${s}')">Remove</button>
       `;
       } else if (d.installed && !d.enabled) {
         status = `Disabled${d.version ? ` \u00B7 v${esc(d.version)}` : ''}`;
         actions = `
-        <button class="action-btn primary" onclick="runAction('enable', '${esc(plugin.fullId)}', '${s}')">Enable</button>
-        <button class="action-btn danger" onclick="runAction('uninstall', '${esc(plugin.fullId)}', '${s}')">Remove</button>
+        <button class="action-btn primary" onclick="runAction('enable', '${escAttrJs(plugin.fullId)}', '${s}')">Enable</button>
+        <button class="action-btn danger" onclick="runAction('uninstall', '${escAttrJs(plugin.fullId)}', '${s}')">Remove</button>
       `;
       } else {
         status = 'Not installed';
-        actions = `<button class="action-btn primary" onclick="runAction('install', '${esc(plugin.fullId)}', '${s}')">Install</button>`;
+        actions = `<button class="action-btn primary" onclick="runAction('install', '${escAttrJs(plugin.fullId)}', '${s}')">Install</button>`;
       }
 
       return `<div class="scope-matrix-row">
@@ -686,7 +684,7 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
 
   let readmeHtml = '';
   if (comps._readmePath && hasDirAccess) {
-    readmeHtml = `<div class="readme-comp-item" onclick="openContentModal('${escJs(pluginId)}', '${escJs(comps._readmePath)}', 'readme')">
+    readmeHtml = `<div class="readme-comp-item" onclick="openContentModal('${escAttrJs(pluginId)}', '${escAttrJs(comps._readmePath)}', 'readme')">
       <span class="icon">${ICONS.readme}</span> ${esc(comps._readmePath)}
     </div>`;
   }
@@ -713,7 +711,7 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
             const clickPath = configFile || (dir ? `${dir}/${name}` : name);
             const cls = hasDirAccess ? '' : ' disabled';
             const click = hasDirAccess
-              ? ` onclick="openContentModal('${escJs(pluginId)}', '${escJs(clickPath)}', '${escJs(type)}')"`
+              ? ` onclick="openContentModal('${escAttrJs(pluginId)}', '${escAttrJs(clickPath)}', '${escAttrJs(type)}')"`
               : '';
             const isFolder = type === 'skills' || type === 'agentSkills';
             html += `<div class="detail-comp-item${cls}"${click}>
@@ -1007,7 +1005,7 @@ function showMarketplaceDetail(name) {
     <div class="detail-header">
       <h3>${ICONS.marketplace} ${esc(m.name)} ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
-        ${m.installLocation ? `<button class="modal-action-btn" title="${esc(m.installLocation)}" onclick="copyPluginPath('${escJs(m.installLocation)}', event)">${ICONS.copyPath}</button><button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({marketplaceName:'${esc(m.name)}',event})">${ICONS.openEditor}</button>` : ''}
+        ${m.installLocation ? `<button class="modal-action-btn" title="${esc(m.installLocation)}" onclick="copyPluginPath('${escAttrJs(m.installLocation)}', event)">${ICONS.copyPath}</button><button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({marketplaceName:'${escAttrJs(m.name)}',event})">${ICONS.openEditor}</button>` : ''}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
       </div>
     </div>
@@ -1027,12 +1025,12 @@ function showMarketplaceDetail(name) {
           <span class="meta-value">${installed} installed / ${total} total</span>
         </div>
       </div>
-      ${m.readmeFile ? `<div class="detail-section"><h4>Documentation</h4><div class="readme-comp-item" onclick="openReadmeModal('${esc(m.name)}', '/api/marketplaces/${encodeURIComponent(m.name)}/readme')">${ICONS.readme} ${esc(m.readmeFile)}</div></div>` : ''}
+      ${m.readmeFile ? `<div class="detail-section"><h4>Documentation</h4><div class="readme-comp-item" onclick="openReadmeModal('${escAttrJs(m.name)}', '/api/marketplaces/${encodeURIComponent(m.name)}/readme')">${ICONS.readme} ${esc(m.readmeFile)}</div></div>` : ''}
       <div class="detail-section">
         <h4>Actions</h4>
         <div class="mkt-actions">
-          <button class="action-btn primary" onclick="runMarketplaceAction('update', '${esc(m.name)}')">Update</button>
-          <button class="action-btn danger" onclick="runMarketplaceAction('remove', '${esc(m.name)}')">Remove</button>
+          <button class="action-btn primary" onclick="runMarketplaceAction('update', '${escAttrJs(m.name)}')">Update</button>
+          <button class="action-btn danger" onclick="runMarketplaceAction('remove', '${escAttrJs(m.name)}')">Remove</button>
         </div>
       </div>
       <div class="detail-section">
@@ -1045,7 +1043,7 @@ function showMarketplaceDetail(name) {
                 : '<span style="color:var(--warning)">disabled</span>'
               : '<span style="color:var(--text-muted)">not installed</span>';
             const updateTag = updateArrow(p);
-            return `<div class="mkt-plugin-item" onclick="if(detailHistory.length<20)detailHistory.push({type:'marketplace',name:'${esc(m.name)}'}); showDetail('${esc(p.fullId)}')">${esc(p.name)} ${status}${updateTag}</div>`;
+            return `<div class="mkt-plugin-item" onclick="if(detailHistory.length<20)detailHistory.push({type:'marketplace',name:'${escAttrJs(m.name)}'}); showDetail('${escAttrJs(p.fullId)}')">${esc(p.name)} ${status}${updateTag}</div>`;
           })
           .join('')}
       </div>
@@ -1271,19 +1269,23 @@ function safeId(str) {
   return str.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' };
+
 function esc(str) {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  if (str == null) return '';
+  return String(str).replace(/[&<>"'`]/g, (c) => HTML_ESCAPES[c]);
 }
 
-function escJs(str) {
-  if (!str) return '';
-  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+// For a value landing inside a quoted JS string inside an HTML attribute —
+// onclick="fn('${escAttrJs(x)}')". The browser HTML-decodes the attribute before
+// the JS parser sees it, so the JS escape must happen first and be escaped in turn.
+function escAttrJs(value) {
+  const js = String(value == null ? '' : value)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+  return esc(js);
 }
 
 function shortenPath(p) {
@@ -1327,7 +1329,7 @@ function renderMarketplaceList() {
     .map((m) => {
       const src = sourceDetail(m);
       const installed = m.plugins.filter((p) => p.isInstalled).length;
-      return `<div class="mkt-list-item" onclick="openMarketplaceFromList('${escJs(m.name)}')">
+      return `<div class="mkt-list-item" onclick="openMarketplaceFromList('${escAttrJs(m.name)}')">
         <span class="tree-icon">${ICONS.marketplace}</span>
         <div class="mkt-list-info">
           <div class="mkt-list-name">${esc(m.name)} ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</div>
@@ -1335,7 +1337,7 @@ function renderMarketplaceList() {
         </div>
         ${sourceBadge(m.source?.type)}
         <span class="mkt-list-count" title="${installed} installed of ${m.plugins.length} plugins">${installed}/${m.plugins.length}</span>
-        <button class="modal-action-btn mkt-list-remove" title="Remove marketplace" onclick="event.stopPropagation(); removeMarketplace('${escJs(m.name)}', this)">${ICONS.trash}</button>
+        <button class="modal-action-btn mkt-list-remove" title="Remove marketplace" onclick="event.stopPropagation(); removeMarketplace('${escAttrJs(m.name)}', this)">${ICONS.trash}</button>
       </div>`;
     })
     .join('');
@@ -1644,11 +1646,7 @@ function initSidebarResize() {
     .catch(() => ({}));
   if (!cfg.enabled) return;
   window.__HUB__ = cfg;
-  const fwd = (e) =>
-    window.parent?.postMessage(
-      { type: 'hub:keydown', key: e.key, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey },
-      '*',
-    );
+  const fwd = (e) => hubPost({ type: 'hub:keydown', key: e.key, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey });
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
@@ -1668,11 +1666,18 @@ function initSidebarResize() {
 
 function hubNavigate(app, url) {
   if (!window.__HUB__?.enabled) return;
-  window.parent?.postMessage({ type: 'hub:navigate', app, url }, '*');
+  hubPost({ type: 'hub:navigate', app, url });
 }
 
 // Hoisted out of initHubTheme so initHubProject can share it.
 const hubOrigin = () => (window.__HUB__?.url ? new URL(window.__HUB__.url).origin : null);
+
+// Every send is addressed to the hub explicitly. With targetOrigin '*' any page that
+// framed this app also received the forwarded keystrokes and navigation intents.
+function hubPost(message) {
+  const origin = hubOrigin();
+  if (origin) window.parent?.postMessage(message, origin);
+}
 
 (function initHubTheme() {
   const getTheme = () => (document.body.classList.contains('light') ? 'light' : 'dark');
@@ -1699,8 +1704,7 @@ const hubOrigin = () => (window.__HUB__?.url ? new URL(window.__HUB__.url).origi
     if (t === lastTheme && ct === lastColorTheme) return;
     lastTheme = t;
     lastColorTheme = ct;
-    const origin = hubOrigin();
-    if (origin) window.parent.postMessage({ type: 'hub:theme', theme: t, colorTheme: ct }, origin);
+    hubPost({ type: 'hub:theme', theme: t, colorTheme: ct });
   }).observe(document.body, {
     attributes: true,
     attributeFilter: ['class', 'data-color-theme'],

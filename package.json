@@ -31,6 +31,7 @@
   "license": "MIT",
   "files": [
     "server.js",
+    "lib/",
     "public/",
     "README.md",
     "LICENSE"
@@ -40,7 +41,8 @@
     "dev": "node server.js --open",
     "lint": "npx @biomejs/biome check public/app.js public/style.css",
     "lint:fix": "npx @biomejs/biome check --fix public/app.js public/style.css",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=18.0.0"
