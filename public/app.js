@@ -151,16 +151,15 @@ document.addEventListener('DOMContentLoaded', () => {
   bindModalKeys('projectPathInput', 'projectPickerModal', submitProjectPicker);
 
   const savedTheme = localStorage.getItem('theme');
-  if (savedTheme === 'dark') {
-    document.body.classList.add('dark-forced');
-  } else {
-    document.body.classList.add('light');
-  }
+  // No saved choice means follow the OS: the CSS default is dark, so only the OS light preference
+  // needs a class here.
+  const isLight = savedTheme ? savedTheme === 'light' : window.matchMedia('(prefers-color-scheme: light)').matches;
+  document.body.classList.add(isLight ? 'light' : 'dark-forced');
   const savedColorTheme = localStorage.getItem('color-theme');
   if (savedColorTheme) document.body.dataset.colorTheme = savedColorTheme;
   syncColorThemeMenu(savedColorTheme || 'ember');
   syncHljsTheme();
-  updateThemeColor(savedTheme !== 'dark');
+  updateThemeColor(isLight);
 
   document.addEventListener('keydown', handleKeydown);
 
