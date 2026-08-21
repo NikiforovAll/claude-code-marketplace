@@ -28,7 +28,7 @@ No build step. No framework. Static files served directly by Express.
 
 **Plugin Scopes**: user (`~/.claude/plugins/`), project (`./<project>/.claude/`), local (`.claude/settings.local.json`). Each scope has independent install/enable state.
 
-**Components**: Skills (`skills/`), commands (`commands/`), agents (`agents/`), MCP servers (`.mcp.json`), hooks (`hooks.json`), LSP servers (`.lsp.json`).
+**Components**: Skills (`skills/`), commands (`commands/`), agents (`agents/`), then the JSON-file types driven by the `JSON_COMPONENTS` table in `server.js` — MCP servers (`.mcp.json`), hooks (`hooks.json`), LSP servers (`.lsp.json`), monitors (`monitors.json`). Each resolves its path as marketplace entry → `.claude-plugin/plugin.json` `experimental.<key>` → default.
 
 **Virtual Marketplaces**: User and project customizations shown as synthetic marketplace entries from local filesystem.
 

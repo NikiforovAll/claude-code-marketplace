@@ -236,7 +236,7 @@ function loadMarketplaces() {
       let source = pd.source || '';
       if (typeof source === 'object') source = source.url || JSON.stringify(source);
 
-      const compKeys = ['skills', 'commands', 'agents', 'mcpServers', 'hooks', 'lspServers'];
+      const compKeys = ['skills', 'commands', 'agents', 'mcpServers', 'hooks', 'lspServers', 'monitors'];
 
       // Resolve origin dir from marketplace source
       let originDir = null;
@@ -360,9 +360,22 @@ function loadMarketplaces() {
   return marketplaces;
 }
 
+const JSON_COMPONENTS = [
+  { key: 'mcpServers', def: '.mcp.json', names: d => Object.keys(d.mcpServers || d) },
+  { key: 'hooks', def: path.join('hooks', 'hooks.json'), names: d => Object.keys(d.hooks || d).filter(k => k !== 'description') },
+  { key: 'lspServers', def: '.lsp.json', names: d => Object.keys(d.lspServers || d) },
+  { key: 'monitors', def: 'monitors.json', names: d => (Array.isArray(d) ? d.map(m => m?.name).filter(Boolean) : []) },
+];
+
 function countComponents(pluginDir, meta = {}) {
-  const result = { skills: [], commands: [], agents: [], mcpServers: [], hooks: [], lspServers: [] };
+  const result = { skills: [], commands: [], agents: [], mcpServers: [], hooks: [], lspServers: [], monitors: [] };
   if (!pluginDir || !fs.existsSync(pluginDir)) return result;
+
+  // The marketplace entry (`meta`) wins, but a plugin can also declare component paths in
+  // its own manifest -- the only place monitors are ever declared. existsSync first: the
+  // virtual-marketplace dirs (~/.claude, <project>/.claude) carry no manifest at all.
+  const manifestFile = path.join(pluginDir, '.claude-plugin', 'plugin.json');
+  const manifest = (fs.existsSync(manifestFile) ? readJsonSafe(manifestFile) : null) || {};
 
   // Skills: check custom paths from metadata, then default
   const skillPaths = meta.skills
@@ -407,38 +420,19 @@ function countComponents(pluginDir, meta = {}) {
 
   const configFiles = {};
 
-  // MCPs
-  const mcpPath = meta.mcpServers || '.mcp.json';
-  const mcpFile = path.resolve(pluginDir, mcpPath);
-  if (fs.existsSync(mcpFile) && fs.statSync(mcpFile).isFile()) {
-    const data = readJsonSafe(mcpFile);
-    if (data) {
-      result.mcpServers = Object.keys(data.mcpServers || data);
-      if (result.mcpServers.length) configFiles.mcpServers = toUnixPath(mcpPath);
-    }
-  }
-
-  // Hooks
-  const hooksPath = meta.hooks || path.join('hooks', 'hooks.json');
-  const hooksFile = path.resolve(pluginDir, hooksPath);
-  if (fs.existsSync(hooksFile) && fs.statSync(hooksFile).isFile()) {
-    const data = readJsonSafe(hooksFile);
-    if (data) {
-      const hooksObj = data.hooks || data;
-      result.hooks = Object.keys(hooksObj).filter(k => k !== 'description');
-      if (result.hooks.length) configFiles.hooks = toUnixPath(hooksPath);
-    }
-  }
-
-  // LSP
-  const lspPath = meta.lspServers || '.lsp.json';
-  const lspFile = path.resolve(pluginDir, lspPath);
-  if (fs.existsSync(lspFile) && fs.statSync(lspFile).isFile()) {
-    const data = readJsonSafe(lspFile);
-    if (data) {
-      result.lspServers = Object.keys(data.lspServers || data);
-      if (result.lspServers.length) configFiles.lspServers = toUnixPath(lspPath);
-    }
+  // Each of these is one JSON file whose names we list: same resolve -> read -> extract
+  // shape, differing only in the default path and in how the names sit inside the file.
+  // monitors.json is an array of objects; the rest are maps keyed by name.
+  for (const { key, def, names } of JSON_COMPONENTS) {
+    const declared = meta[key] || manifest.experimental?.[key] || def;
+    const file = path.resolve(pluginDir, declared);
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) continue;
+    const data = readJsonSafe(file);
+    if (!data) continue;
+    result[key] = names(data);
+    // normalize before toUnixPath: a manifest writes "./monitors.json", and a leading "./"
+    // survives into the preview URL the client builds from this path.
+    if (result[key].length) configFiles[key] = toUnixPath(path.normalize(declared));
   }
 
   const readmeFile = findReadmeFile(pluginDir);
