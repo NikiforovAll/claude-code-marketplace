@@ -619,7 +619,7 @@ function heatInk(t) {
 }
 
 function heatPill(cls, t, text) {
-  return `<span class="heat-pill ${cls}" style="background:${heatColor(t)};color:${heatInk(t)}">${text}</span>`;
+  return `<span class="heat-pill ${esc(cls)}" style="background:${heatColor(t)};color:${heatInk(t)}">${text}</span>`;
 }
 
 function heatUnderlay(t) {
@@ -646,10 +646,10 @@ function renderHeatBits(p) {
     .join(', ');
   const parts = [];
   if (skills.length) {
-    parts.push(`${skills.length} skill${skills.length === 1 ? '' : 's'} used${top ? ` — ${esc(top)}` : ''}`);
+    parts.push(`${skills.length} skill${skills.length === 1 ? '' : 's'} used${top ? ` — ${top}` : ''}`);
   }
   if (direct) parts.push(`activated ${direct.usageCount}×, last used ${relUsedDate(direct.lastUsedAt)}`);
-  const title = ` title="${total} uses · ${parts.join(' · ')}"`;
+  const title = ` title="${esc(`${total} uses · ${parts.join(' · ')}`)}"`;
   return { underlay: heatUnderlay(t), pill, title };
 }
 
