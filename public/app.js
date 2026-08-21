@@ -589,9 +589,12 @@ function pluginUsage(p) {
   return { total: Math.max(total, direct?.usageCount || 0), skills, direct };
 }
 
-// tint steps derived from the active theme's accent so every color theme stays coherent
+// hybrid ramp: lower half tints the accent into the surface (theme-coherent, subtle),
+// upper half shifts the hue past the accent toward crimson so hot steps stay discernible
 function heatColor(t) {
-  return `color-mix(in srgb, var(--accent) ${Math.round(15 + t * 85)}%, var(--bg-elevated))`;
+  return t < 0.5
+    ? `color-mix(in oklch, var(--accent) ${Math.round(15 + t * 2 * 85)}%, var(--bg-elevated))`
+    : `color-mix(in oklch, #b3123c ${Math.round((t - 0.5) * 2 * 85)}%, var(--accent))`;
 }
 
 function skillHeatT(count) {
@@ -615,7 +618,7 @@ function fmtCount(n) {
 }
 
 function heatInk(t) {
-  return t > 0.55 ? '#fff' : 'var(--text-primary)';
+  return t > 0.45 ? '#fff' : 'var(--text-primary)';
 }
 
 function heatPill(cls, t, text) {
@@ -623,7 +626,7 @@ function heatPill(cls, t, text) {
 }
 
 function heatUnderlay(t) {
-  return `<span class="heat-underlay" style="width:calc(${Math.max(3, Math.round(t * 100))}% - 24px);background:color-mix(in srgb, var(--accent) ${Math.round(25 + t * 45)}%, transparent)"></span>`;
+  return `<span class="heat-underlay" style="width:calc(${Math.max(3, Math.round(t * 100))}% - 24px);background:${heatColor(t)};opacity:.75"></span>`;
 }
 
 function updateHeatLegend() {
