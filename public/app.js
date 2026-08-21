@@ -2,6 +2,10 @@ let marketplaces = [];
 let selectedPluginId = null;
 let searchFilter = '';
 let scopeFilter = 'installed';
+let skillUsage = {};
+let pluginUsageData = {};
+let heatmapMode = localStorage.getItem('heatmap-mode') === '1';
+let heatSkillsOnly = localStorage.getItem('heat-skills-only') === '1';
 const expandedNodes = new Set();
 let componentCache = {};
 const detailHistory = [];
@@ -129,6 +133,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('refreshBtn').addEventListener('click', refresh);
+  document.getElementById('heatmapBtn').addEventListener('click', toggleHeatmap);
+  document.body.classList.toggle('heatmap', heatmapMode);
+  document.getElementById('heatmapBtn').classList.toggle('heat-active', heatmapMode);
+  const skillsOnlyCb = document.getElementById('heatSkillsOnly');
+  skillsOnlyCb.checked = heatSkillsOnly;
+  skillsOnlyCb.addEventListener('change', () => {
+    heatSkillsOnly = skillsOnlyCb.checked;
+    localStorage.setItem('heat-skills-only', heatSkillsOnly ? '1' : '0');
+    _heatScale = null;
+    refreshHeatViews();
+  });
   document.getElementById('themeBtn').addEventListener('click', toggleTheme);
   document.getElementById('themePickerBtn').addEventListener('click', toggleThemeMenu);
   buildThemeMenu();
@@ -294,8 +309,12 @@ function renderProjectPath(dirPath) {
 async function loadData() {
   try {
     componentCache = {};
-    const res = await fetch('/api/marketplaces');
+    const [res, usageRes] = await Promise.all([fetch('/api/marketplaces'), fetch('/api/skill-usage')]);
     marketplaces = await res.json();
+    const usage = await usageRes.json();
+    skillUsage = usage.skills || {};
+    pluginUsageData = usage.plugins || {};
+    _heatScale = null;
     for (const m of marketplaces) {
       m.updateCount = m.plugins.filter((p) => p.hasUpdate).length;
     }
@@ -421,6 +440,21 @@ function renderTree() {
   const allExpanded = allIds.length > 0 && allIds.every((id) => expandedNodes.has(id));
   let html = `<div class="tree-expand-toggle" id="toggleExpandBtn" onclick="toggleExpandAll()">${allExpanded ? 'Collapse All' : 'Expand All'}</div>`;
 
+  let mktTotals = null;
+  let mktLogMax = 1;
+  if (heatmapMode) {
+    if (!_heatScale) computeHeatScale();
+    updateHeatLegend();
+    mktTotals = new Map();
+    for (const m of marketplaces) {
+      mktTotals.set(
+        m.name,
+        filterPlugins(m.plugins).reduce((sum, p) => sum + pluginUsage(p).total, 0),
+      );
+    }
+    mktLogMax = Math.log(Math.max(1, ...mktTotals.values()) + 1) || 1;
+  }
+
   for (const m of marketplaces) {
     const mid = safeId(m.name);
     const plugins = filterPlugins(m.plugins);
@@ -441,7 +475,16 @@ function renderTree() {
       ? ''
       : `<button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${escAttrJs(m.name)}')" title="Marketplace info">${ICONS.kebab}</button>`;
 
+    let mktHeat = '';
+    if (heatmapMode) {
+      const total = mktTotals.get(m.name) || 0;
+      const t = Math.log(total + 1) / mktLogMax;
+      const pill = total ? heatPill('mkt', t, fmtCount(total)) : '<span class="heat-pill mkt dim">0</span>';
+      mktHeat = heatUnderlay(t) + pill;
+    }
+
     html += `<div class="tree-row marketplace-row${m.isVirtual ? ' virtual' : ''}" data-row-type="marketplace" data-row-id="m_${mid}" onclick="toggleChildren('m_${mid}')">
+      ${mktHeat}
       <span class="tree-chevron${mExpanded ? ' expanded' : ''}" id="chev_m_${mid}">\u25B6</span>
       <span class="tree-icon">${mIcon}</span>
       <span class="tree-label"><span class="mkt-name">${esc(m.name)}</span> ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</span>
@@ -484,8 +527,11 @@ function renderPluginRow(p) {
   const icon = p.isVirtual ? ICONS.gear : ICONS.plugin;
 
   const desc = `<span class="tree-desc-inline">${p.description ? esc(p.description) : ''}</span>`;
+  const heat = heatmapMode ? renderHeatBits(p) : { underlay: '', pill: '', title: '' };
 
-  const html = `<div class="tree-row${selected}${virtualCls}" data-row-type="plugin" data-row-id="${esc(p.fullId)}" onclick="showDetail('${escAttrJs(p.fullId)}')">
+  const html = `<div class="tree-row${selected}${virtualCls}" data-row-type="plugin" data-row-id="${esc(p.fullId)}"${heat.title} onclick="showDetail('${escAttrJs(p.fullId)}')">
+    ${heat.underlay}
+    ${heat.pill}
     <span class="tree-indent" style="width:40px"></span>
     <span class="tree-icon">${icon}</span>
     <span class="tree-label">${esc(p.name)} ${ver} ${updateIndicator}</span>
@@ -495,6 +541,139 @@ function renderPluginRow(p) {
   </div>`;
 
   return html;
+}
+
+// --- Usage Heatmap ---
+
+let _heatScale = null;
+
+function computeHeatScale() {
+  let maxSkill = 0;
+  const totals = {};
+  for (const [key, u] of Object.entries(skillUsage)) {
+    if (u.usageCount > maxSkill) maxSkill = u.usageCount;
+    const group = key.includes(':') ? key.slice(0, key.indexOf(':')) : key;
+    totals[group] = (totals[group] || 0) + u.usageCount;
+  }
+  const maxTotal = Math.max(
+    1,
+    ...Object.values(totals),
+    ...(heatSkillsOnly ? [] : Object.values(pluginUsageData).map((u) => u.usageCount)),
+  );
+  _heatScale = { logSkill: Math.log(maxSkill + 1) || 1, logTotal: Math.log(maxTotal + 1) || 1, maxSkill, maxTotal };
+}
+
+function pluginUsage(p) {
+  const prefix = `${p.name}:`;
+  const bareNames = p.isVirtual
+    ? new Set(
+        ['skills', 'commands'].flatMap((k) =>
+          (Array.isArray(p.components?.[k]) ? p.components[k] : []).map((n) => n.replace(/\.md$/, '')),
+        ),
+      )
+    : null;
+  const skills = [];
+  let total = 0;
+  for (const [key, u] of Object.entries(skillUsage)) {
+    let skillName = null;
+    if (key.startsWith(prefix)) skillName = key.slice(prefix.length);
+    else if (bareNames && !key.includes(':') && bareNames.has(key)) skillName = key;
+    if (skillName) {
+      skills.push({ name: skillName, count: u.usageCount, lastUsedAt: u.lastUsedAt });
+      total += u.usageCount;
+    }
+  }
+  skills.sort((a, b) => b.count - a.count);
+  // pluginUsage tracks activations directly (keyed `name@marketplace` = fullId), covering plugins with no skills (MCP/LSP/hooks)
+  const direct = p.isVirtual || heatSkillsOnly ? null : pluginUsageData[p.fullId];
+  return { total: Math.max(total, direct?.usageCount || 0), skills, direct };
+}
+
+// tint steps derived from the active theme's accent so every color theme stays coherent
+function heatColor(t) {
+  return `color-mix(in srgb, var(--accent) ${Math.round(15 + t * 85)}%, var(--bg-elevated))`;
+}
+
+function skillHeatT(count) {
+  if (!_heatScale) computeHeatScale();
+  return Math.log(count + 1) / _heatScale.logSkill;
+}
+
+function relUsedDate(ts) {
+  const days = Math.max(0, (Date.now() - ts) / 86400000);
+  if (days < 1) return 'today';
+  if (days < 2) return 'yesterday';
+  if (days < 30) return `${Math.round(days)}d ago`;
+  if (days < 365) return `${Math.round(days / 30)}mo ago`;
+  return `${Math.round(days / 365)}y ago`;
+}
+
+function fmtCount(n) {
+  if (n < 1000) return `${n}`;
+  if (n < 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return `${Math.round(n / 1000)}k`;
+}
+
+function heatInk(t) {
+  return t > 0.55 ? '#fff' : 'var(--text-primary)';
+}
+
+function heatPill(cls, t, text) {
+  return `<span class="heat-pill ${cls}" style="background:${heatColor(t)};color:${heatInk(t)}">${text}</span>`;
+}
+
+function heatUnderlay(t) {
+  return `<span class="heat-underlay" style="width:calc(${Math.max(3, Math.round(t * 100))}% - 24px);background:color-mix(in srgb, var(--accent) ${Math.round(25 + t * 45)}%, transparent)"></span>`;
+}
+
+function updateHeatLegend() {
+  if (!_heatScale) computeHeatScale();
+  const ramp = [0, 0.25, 0.5, 0.75, 1].map((t) => `<i style="background:${heatColor(t)}"></i>`).join('');
+  document.getElementById('heatLegend').innerHTML =
+    `usage heat <span class="ramp">${ramp}</span> plugins up to ${fmtCount(_heatScale.maxTotal)} · skills up to ${fmtCount(_heatScale.maxSkill)} (log scale)`;
+}
+
+// all heat elements are absolutely positioned overlays so toggling the mode never shifts the layout
+function renderHeatBits(p) {
+  if (!_heatScale) computeHeatScale();
+  const { total, skills, direct } = pluginUsage(p);
+  if (!total) return { underlay: '', pill: '<span class="heat-pill row dim">0</span>', title: '' };
+  const t = Math.log(total + 1) / _heatScale.logTotal;
+  const pill = heatPill('row', t, fmtCount(total));
+  const top = skills
+    .slice(0, 5)
+    .map((s) => `${s.name}: ${s.count}`)
+    .join(', ');
+  const parts = [];
+  if (skills.length) {
+    parts.push(`${skills.length} skill${skills.length === 1 ? '' : 's'} used${top ? ` — ${esc(top)}` : ''}`);
+  }
+  if (direct) parts.push(`activated ${direct.usageCount}×, last used ${relUsedDate(direct.lastUsedAt)}`);
+  const title = ` title="${total} uses · ${parts.join(' · ')}"`;
+  return { underlay: heatUnderlay(t), pill, title };
+}
+
+function heatBadgeFor(pluginId, type, name) {
+  if (!heatmapMode || (type !== 'skills' && type !== 'commands')) return '';
+  const plugin = findPlugin(pluginId);
+  if (!plugin) return '';
+  const key = type === 'commands' ? name.replace(/\.md$/, '') : name;
+  const u = plugin.isVirtual ? skillUsage[key] : skillUsage[`${plugin.name}:${key}`];
+  if (!u) return '';
+  return heatPill('detail', skillHeatT(u.usageCount), `${u.usageCount} · ${relUsedDate(u.lastUsedAt)}`);
+}
+
+function refreshHeatViews() {
+  renderTree();
+  if (selectedPluginId) showDetail(selectedPluginId);
+}
+
+function toggleHeatmap() {
+  heatmapMode = !heatmapMode;
+  localStorage.setItem('heatmap-mode', heatmapMode ? '1' : '0');
+  document.body.classList.toggle('heatmap', heatmapMode);
+  document.getElementById('heatmapBtn').classList.toggle('heat-active', heatmapMode);
+  refreshHeatViews();
 }
 
 function renderScopeToggles(plugin) {
@@ -718,6 +897,7 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
             html += `<div class="detail-comp-item${cls}"${click}>
             <span class="icon">${isFolder ? ICONS.folder : ICONS.file}</span>
             ${esc(compItemLabel(type, name, names.length))}
+            ${heatBadgeFor(pluginId, type, name)}
           </div>`;
           }
           html += '</div>';

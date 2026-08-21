@@ -646,6 +646,17 @@ function isPathAllowed(fullPath, pluginDir, pluginId) {
 
 // --- API Routes ---
 
+app.get('/api/skill-usage', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const raw = fs.readFileSync(path.join(os.homedir(), '.claude.json'), 'utf-8');
+    const data = JSON.parse(raw);
+    res.json({ skills: data.skillUsage || {}, plugins: data.pluginUsage || {} });
+  } catch {
+    res.json({ skills: {}, plugins: {} });
+  }
+});
+
 app.get('/api/marketplaces', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {

@@ -1549,3 +1549,104 @@ kbd {
 .detail-comp-group.view-only:hover {
   opacity: 0.85;
 }
+
+/* === USAGE HEATMAP === */
+
+.topbar-btn.heat-active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.spacer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.heat-legend {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+body.heatmap .heat-legend {
+  display: flex;
+}
+.heat-skills-only {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  padding-right: 14px;
+  user-select: none;
+}
+body.heatmap .heat-skills-only {
+  display: flex;
+}
+.heat-skills-only input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+.heat-legend .ramp {
+  display: flex;
+  gap: 2px;
+}
+.heat-legend .ramp i {
+  width: 14px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.tree-row {
+  position: relative;
+}
+.heat-underlay {
+  position: absolute;
+  left: 12px;
+  bottom: 2px;
+  height: 3px;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+.heat-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.heat-pill.dim {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 400;
+}
+/* overlays: pills sit in space that is empty in both modes, so toggling never shifts the layout */
+.heat-pill.row {
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+.heat-pill.mkt {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+.heat-pill.detail {
+  margin-left: auto;
+  font-weight: 500;
+}
