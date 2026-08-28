@@ -766,7 +766,7 @@ async function showDetail(pluginId) {
     <div class="detail-header">
       <h3>${headerIcon} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
-        ${detailHeaderBtns(plugin._pluginDir, plugin._originDir, `{pluginId:'${escAttrJs(plugin.fullId)}',event}`)}
+        ${detailHeaderBtns(plugin._pluginDir, plugin._originDir, { pluginId: plugin.fullId })}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
       </div>
     </div>
@@ -1025,21 +1025,31 @@ async function copyContentPath(event) {
   await copyToClipboard(full, event?.currentTarget);
 }
 
-async function copyPluginPath(pluginDir, event) {
-  if (pluginDir) await copyToClipboard(pluginDir, event?.currentTarget);
+async function copyText(text, event) {
+  if (text) await copyToClipboard(text, event?.currentTarget);
 }
 
-function detailHeaderBtns(dir, source, openArgs) {
-  const copyBtn = dir
-    ? `<button class="modal-action-btn" title="${esc(dir)}" onclick="copyPluginPath('${escAttrJs(dir)}', event)">${ICONS.copyPath}</button>`
-    : '';
-  const srcBtn = source
-    ? `<button class="modal-action-btn" title="Copy source: ${esc(source)}" onclick="copyPluginPath('${escAttrJs(source)}', event)">${ICONS.copySource}</button>`
-    : '';
-  const editBtn = dir
-    ? `<button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor(${openArgs})">${ICONS.openEditor}</button>`
-    : '';
-  return copyBtn + srcBtn + editBtn;
+function samePath(a, b) {
+  return !!a && !!b && a.split('\\').join('/') === b.split('\\').join('/');
+}
+
+function actionBtn(title, onclick, icon) {
+  return `<button class="modal-action-btn" title="${esc(title)}" onclick="${onclick}">${icon}</button>`;
+}
+
+function copyBtn(text, title, icon) {
+  return text ? actionBtn(title, `copyText('${escAttrJs(text)}', event)`, icon) : '';
+}
+
+function detailHeaderBtns(dir, source, openTarget) {
+  const args = Object.entries(openTarget)
+    .map(([k, v]) => `${k}:'${escAttrJs(v)}'`)
+    .join(',');
+  return (
+    copyBtn(dir, dir, ICONS.copyPath) +
+    copyBtn(samePath(source, dir) ? '' : source, `Copy source: ${source}`, ICONS.copySource) +
+    (dir ? actionBtn('Open in VS Code', `openFolderInEditor({${args},event})`, ICONS.openEditor) : '')
+  );
 }
 
 async function openFolderInEditor({ pluginId, marketplaceName, event } = {}) {
@@ -1205,7 +1215,7 @@ function showMarketplaceDetail(name) {
     <div class="detail-header">
       <h3>${ICONS.marketplace} ${esc(m.name)} ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
-        ${detailHeaderBtns(m.installLocation, srcDetail, `{marketplaceName:'${escAttrJs(m.name)}',event}`)}
+        ${detailHeaderBtns(m.installLocation, srcDetail, { marketplaceName: m.name })}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
       </div>
     </div>
