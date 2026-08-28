@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
   restoreAppState();
   initProjectScope();
   initSidebarResize();
+  initDetailHeaderActions();
 
   let searchTimer;
   document.getElementById('searchInput').addEventListener('input', (e) => {
@@ -1025,31 +1026,37 @@ async function copyContentPath(event) {
   await copyToClipboard(full, event?.currentTarget);
 }
 
-async function copyText(text, event) {
-  if (text) await copyToClipboard(text, event?.currentTarget);
-}
-
 function samePath(a, b) {
   return !!a && !!b && a.split('\\').join('/') === b.split('\\').join('/');
 }
 
-function actionBtn(title, onclick, icon) {
-  return `<button class="modal-action-btn" title="${esc(title)}" onclick="${onclick}">${icon}</button>`;
-}
-
 function copyBtn(text, title, icon) {
-  return text ? actionBtn(title, `copyText('${escAttrJs(text)}', event)`, icon) : '';
+  if (!text) return '';
+  return `<button class="modal-action-btn" title="${esc(title)}" data-copy="${esc(text)}">${icon}</button>`;
 }
 
 function detailHeaderBtns(dir, source, openTarget) {
-  const args = Object.entries(openTarget)
-    .map(([k, v]) => `${k}:'${escAttrJs(v)}'`)
-    .join(',');
+  const [openKey, openVal] = Object.entries(openTarget)[0];
+  const editBtn = dir
+    ? `<button class="modal-action-btn" title="Open in VS Code" data-open-key="${esc(openKey)}" data-open-val="${esc(openVal)}">${ICONS.openEditor}</button>`
+    : '';
   return (
     copyBtn(dir, dir, ICONS.copyPath) +
     copyBtn(samePath(source, dir) ? '' : source, `Copy source: ${source}`, ICONS.copySource) +
-    (dir ? actionBtn('Open in VS Code', `openFolderInEditor({${args},event})`, ICONS.openEditor) : '')
+    editBtn
   );
+}
+
+// Delegated so the header buttons carry data, not inline onclick source strings.
+function initDetailHeaderActions() {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest?.('.detail-header-actions .modal-action-btn');
+    if (!btn) return;
+    if (btn.dataset.copy) copyToClipboard(btn.dataset.copy, btn);
+    else if (btn.dataset.openKey) {
+      postAndFlash('/api/open-folder-in-editor', { [btn.dataset.openKey]: btn.dataset.openVal }, btn);
+    }
+  });
 }
 
 async function openFolderInEditor({ pluginId, marketplaceName, event } = {}) {
