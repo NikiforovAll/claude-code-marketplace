@@ -59,6 +59,9 @@ ICONS.openEditor =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.583 2.207a1.1 1.1 0 0 1 1.541.033l2.636 2.636a1.1 1.1 0 0 1 .033 1.541L10.68 17.53a1.1 1.1 0 0 1-.345.247l-4.56 1.903a.55.55 0 0 1-.725-.725l1.903-4.56a1.1 1.1 0 0 1 .247-.345zm.902 1.87-8.794 8.793-.946 2.268 2.268-.946 8.794-8.793z"/></svg>';
 ICONS.copyPath =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+ICONS.copySource = SVG(
+  '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+);
 ICONS.trash = SVG(
   '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
 );
@@ -763,7 +766,7 @@ async function showDetail(pluginId) {
     <div class="detail-header">
       <h3>${headerIcon} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
-        ${plugin._pluginDir ? `<button class="modal-action-btn" title="${esc(plugin._pluginDir)}" onclick="copyPluginPath('${escAttrJs(plugin._pluginDir)}', event)">${ICONS.copyPath}</button><button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({pluginId:'${escAttrJs(plugin.fullId)}',event})">${ICONS.openEditor}</button>` : ''}
+        ${detailHeaderBtns(plugin._pluginDir, plugin._originDir, `{pluginId:'${escAttrJs(plugin.fullId)}',event}`)}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
       </div>
     </div>
@@ -1026,6 +1029,19 @@ async function copyPluginPath(pluginDir, event) {
   if (pluginDir) await copyToClipboard(pluginDir, event?.currentTarget);
 }
 
+function detailHeaderBtns(dir, source, openArgs) {
+  const copyBtn = dir
+    ? `<button class="modal-action-btn" title="${esc(dir)}" onclick="copyPluginPath('${escAttrJs(dir)}', event)">${ICONS.copyPath}</button>`
+    : '';
+  const srcBtn = source
+    ? `<button class="modal-action-btn" title="Copy source: ${esc(source)}" onclick="copyPluginPath('${escAttrJs(source)}', event)">${ICONS.copySource}</button>`
+    : '';
+  const editBtn = dir
+    ? `<button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor(${openArgs})">${ICONS.openEditor}</button>`
+    : '';
+  return copyBtn + srcBtn + editBtn;
+}
+
 async function openFolderInEditor({ pluginId, marketplaceName, event } = {}) {
   if (!pluginId && !marketplaceName) return;
   await postAndFlash('/api/open-folder-in-editor', { pluginId, marketplaceName }, event?.currentTarget);
@@ -1189,7 +1205,7 @@ function showMarketplaceDetail(name) {
     <div class="detail-header">
       <h3>${ICONS.marketplace} ${esc(m.name)} ${m.version ? `<span class="version">v${esc(m.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
-        ${m.installLocation ? `<button class="modal-action-btn" title="${esc(m.installLocation)}" onclick="copyPluginPath('${escAttrJs(m.installLocation)}', event)">${ICONS.copyPath}</button><button class="modal-action-btn" title="Open in VS Code" onclick="openFolderInEditor({marketplaceName:'${escAttrJs(m.name)}',event})">${ICONS.openEditor}</button>` : ''}
+        ${detailHeaderBtns(m.installLocation, srcDetail, `{marketplaceName:'${escAttrJs(m.name)}',event}`)}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
       </div>
     </div>
