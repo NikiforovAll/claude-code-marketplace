@@ -1658,7 +1658,7 @@ function handleKeydown(e) {
 
   const openModal = document.querySelector('.modal-overlay.open');
   if (openModal) {
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' || (e.key === '?' && openModal.id === 'helpModal')) {
       openModal.classList.remove('open');
       e.preventDefault();
     }
@@ -1714,10 +1714,18 @@ function handleKeydown(e) {
   }
 
   // Shift-modified on purpose: plain u/p collide with Vimium-style extension bindings.
-  if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'U' || e.key === 'P')) {
-    e.preventDefault();
-    openCustomClaudeMd(e.key === 'U' ? 'user' : 'project');
-    return;
+  if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    if (e.key === 'U') {
+      e.preventDefault();
+      openCustomClaudeMd('user');
+      return;
+    }
+    // Shift+P is the project switcher across the hub apps; matches memory.
+    if (e.key === 'P') {
+      e.preventDefault();
+      changeProject();
+      return;
+    }
   }
 
   const rows = getVisibleRows();
@@ -1795,21 +1803,96 @@ async function openCustomClaudeMd(scope) {
   openContentModal(pluginId, file, 'claudeMd');
 }
 
-let _helpModalHandler = null;
+// Each entry pairs a left and a right group onto the same grid rows, so their
+// headings sit level and the shorter group just leaves empty rows.
+// `combo` joins the keys with a plus (a chord) instead of listing them as
+// alternatives; `hub` marks rows that only work inside Claude Code Hub.
+const SHORTCUT_PAIRS = [
+  [
+    {
+      title: 'Navigate',
+      rows: [
+        { keys: ['J', '↓'], label: 'Next row' },
+        { keys: ['K', '↑'], label: 'Previous row' },
+        { keys: ['L', '→'], label: 'Expand marketplace' },
+        { keys: ['H', '←'], label: 'Collapse / go to parent' },
+        { keys: ['Enter', 'Space'], label: 'Select / toggle' },
+      ],
+    },
+    {
+      title: 'Find',
+      rows: [
+        { keys: ['/'], label: 'Focus search' },
+        { keys: ['S'], label: 'Focus scope filter' },
+        { keys: ['Esc'], label: 'Close panel / blur input' },
+      ],
+    },
+  ],
+  [
+    {
+      title: 'Open',
+      rows: [
+        { keys: ['E'], label: 'Open plugin in editor' },
+        { keys: ['Shift', 'U'], combo: true, label: 'Open user CLAUDE.md' },
+        { keys: ['Shift', 'P'], combo: true, label: 'Switch project' },
+      ],
+    },
+    {
+      title: 'View',
+      rows: [
+        { keys: ['R'], label: 'Refresh data' },
+        { keys: ['T'], label: 'Toggle theme' },
+        { keys: ['?'], label: 'Show this help' },
+      ],
+    },
+  ],
+  [
+    {
+      title: 'Hub',
+      hub: true,
+      rows: [
+        { keys: ['Ctrl', 'Alt', '←/→'], combo: true, label: 'Previous / next hub app' },
+        { keys: ['Alt', '1…9'], combo: true, label: 'Jump to hub app by number' },
+        { keys: ['Ctrl', 'Alt', 'P'], combo: true, label: 'Project picker' },
+      ],
+    },
+  ],
+];
+
+const EMPTY_GROUP = { title: '', rows: [] };
+
+// Interleaves each pair's rows left-then-right so CSS grid auto-placement lands
+// them on shared row tracks (see .shortcuts in style.css).
+function buildHelpShortcuts() {
+  const cells = [];
+  SHORTCUT_PAIRS.forEach(([left, right = EMPTY_GROUP], pair) => {
+    const first = pair === 0 ? ' sc-first' : '';
+    const sides = [
+      [left, 'sc-l'],
+      [right, 'sc-r'],
+    ];
+    const head = (g, side) =>
+      g.title ? `<div class="${esc(`sc-group ${side}${first}${g.hub ? ' sc-hub' : ''}`)}">${g.title}</div>` : '';
+    cells.push(sides.map(([g, side]) => head(g, side)).join(''));
+    for (let i = 0; i < Math.max(left.rows.length, right.rows.length); i++) {
+      for (const [group, side] of sides) {
+        const row = group.rows[i];
+        if (!row) continue;
+        const sep = row.combo ? '<span class="sc-plus">+</span>' : '<span class="sc-or">/</span>';
+        const keys = row.keys.map((k) => `<kbd>${esc(k)}</kbd>`).join(sep);
+        const cls = side + (group.hub ? ' sc-hub' : '');
+        cells.push(`<dt class="${esc(cls)}">${keys}</dt><dd class="${esc(cls)}">${esc(row.label)}</dd>`);
+      }
+    }
+  });
+  return cells.join('');
+}
 
 function showHelpModal() {
+  const list = document.getElementById('helpShortcuts');
+  if (!list.childElementCount) list.innerHTML = buildHelpShortcuts();
+  list.classList.toggle('sc-standalone', !window.__HUB__?.enabled);
   document.getElementById('helpModal').classList.add('open');
-  if (_helpModalHandler) document.removeEventListener('keydown', _helpModalHandler, true);
-  _helpModalHandler = (e) => {
-    if (e.key === 'Escape' || e.key === '?') {
-      e.preventDefault();
-      e.stopPropagation();
-      closeModal('helpModal');
-      document.removeEventListener('keydown', _helpModalHandler, true);
-      _helpModalHandler = null;
-    }
-  };
-  document.addEventListener('keydown', _helpModalHandler, true);
 }
 
 if ('serviceWorker' in navigator) {
