@@ -23,14 +23,21 @@ app.get('/hub-config', (_req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+const DEFAULT_CLAUDE_DIR = path.join(os.homedir(), '.claude');
+
 function getClaudeDir() {
   const dir = getArg('dir') || process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_DIR;
   if (dir) return dir.startsWith('~') ? dir.replace('~', os.homedir()) : dir;
-  return path.join(os.homedir(), '.claude');
+  return DEFAULT_CLAUDE_DIR;
 }
 
 const CLAUDE_DIR = getClaudeDir();
 const PLUGINS_DIR = path.join(CLAUDE_DIR, 'plugins');
+// Claude Code keeps .claude.json beside ~/.claude by default but inside CLAUDE_CONFIG_DIR
+// when that is set, so the default dir must stay unset for the CLI rather than be spelled out.
+const IS_DEFAULT_CLAUDE_DIR = path.resolve(CLAUDE_DIR) === path.resolve(DEFAULT_CLAUDE_DIR);
+const CLAUDE_JSON = IS_DEFAULT_CLAUDE_DIR ? path.join(os.homedir(), '.claude.json') : path.join(CLAUDE_DIR, '.claude.json');
+const CLI_ENV = IS_DEFAULT_CLAUDE_DIR ? process.env : { ...process.env, CLAUDE_CONFIG_DIR: CLAUDE_DIR };
 
 let _marketplaceCache = null;
 function getCachedMarketplaces() {
@@ -649,7 +656,7 @@ function isPathAllowed(fullPath, pluginDir, pluginId) {
 app.get('/api/skill-usage', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const raw = fs.readFileSync(path.join(os.homedir(), '.claude.json'), 'utf-8');
+    const raw = fs.readFileSync(CLAUDE_JSON, 'utf-8');
     const data = JSON.parse(raw);
     res.json({ skills: data.skillUsage || {}, plugins: data.pluginUsage || {} });
   } catch {
@@ -830,7 +837,7 @@ async function runClaudePlugin(args) {
   // cwd is re-checked here rather than trusting the value PUT /api/project
   // validated earlier — the directory can be removed or replaced in between.
   const cwd = isExistingDir(projectPath) ? projectPath : undefined;
-  const { stdout } = await execNoShell('claude', ['plugin', ...args], { timeout: 30000, cwd });
+  const { stdout } = await execNoShell('claude', ['plugin', ...args], { timeout: 30000, cwd, env: CLI_ENV });
   return stdout.trim();
 }
 

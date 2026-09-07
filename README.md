@@ -46,7 +46,7 @@ That's it — the dashboard reads your `~/.claude/plugins/` registry and opens i
 --open            Open browser on start
 ```
 
-The config dir can also be set via the `CLAUDE_CONFIG_DIR` environment variable.
+The config dir can also be set via the `CLAUDE_CONFIG_DIR` environment variable. With a custom dir, the `claude plugin` commands run against that dir and skill usage is read from `<dir>/.claude.json`.
 
 ## License
 
