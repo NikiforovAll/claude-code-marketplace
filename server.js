@@ -33,11 +33,21 @@ function getClaudeDir() {
 
 const CLAUDE_DIR = getClaudeDir();
 const PLUGINS_DIR = path.join(CLAUDE_DIR, 'plugins');
+const KNOWN_MARKETPLACES_FILE = path.join(PLUGINS_DIR, 'known_marketplaces.json');
 // Claude Code keeps .claude.json beside ~/.claude by default but inside CLAUDE_CONFIG_DIR
 // when that is set, so the default dir must stay unset for the CLI rather than be spelled out.
 const IS_DEFAULT_CLAUDE_DIR = path.resolve(CLAUDE_DIR) === path.resolve(DEFAULT_CLAUDE_DIR);
 const CLAUDE_JSON = IS_DEFAULT_CLAUDE_DIR ? path.join(os.homedir(), '.claude.json') : path.join(CLAUDE_DIR, '.claude.json');
-const CLI_ENV = IS_DEFAULT_CLAUDE_DIR ? process.env : { ...process.env, CLAUDE_CONFIG_DIR: CLAUDE_DIR };
+// `--dir ~/.claude` with CLAUDE_CONFIG_DIR pointing elsewhere in the inherited
+// environment would otherwise read one registry and write the other, so the
+// default dir unsets the variable instead of inheriting it.
+const CLI_ENV = { ...process.env };
+if (IS_DEFAULT_CLAUDE_DIR) {
+  delete CLI_ENV.CLAUDE_CONFIG_DIR;
+  delete CLI_ENV.CLAUDE_DIR;
+} else {
+  CLI_ENV.CLAUDE_CONFIG_DIR = CLAUDE_DIR;
+}
 
 let _marketplaceCache = null;
 function getCachedMarketplaces() {
@@ -171,8 +181,7 @@ function buildScopeData(registry) {
 }
 
 function loadMarketplaces() {
-  const knownFile = path.join(PLUGINS_DIR, 'known_marketplaces.json');
-  const known = readJsonSafe(knownFile);
+  const known = readJsonSafe(KNOWN_MARKETPLACES_FILE);
   if (!known) return [];
 
   const registry = loadRegistry();
@@ -802,7 +811,7 @@ app.post('/api/open-folder-in-editor', (req, res) => {
 });
 
 app.get('/api/project', (req, res) => {
-  res.json({ path: projectPath, explicit: projectExplicit });
+  res.json({ path: projectPath, explicit: projectExplicit, configDir: CLAUDE_DIR });
 });
 
 app.put('/api/project', (req, res) => {
@@ -829,6 +838,30 @@ app.post('/api/refresh', (req, res) => {
 // that git-style flag parsing would read as an option.
 const PLUGIN_FLAGS = new Set(['--scope']);
 
+// The CLI prints a progress line and its result on one line, joined only by a
+// status glyph ("Adding marketplace…√ Marketplace 'x' already on disk"), so the
+// text after the last glyph is the part worth showing.
+const CLI_STATUS_GLYPH = /[✓✔√✖✗✘×]/;
+
+function cleanCliOutput(text) {
+  const tail = String(text || '').split(CLI_STATUS_GLYPH).pop();
+  return tail.split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean).join(' ');
+}
+
+// Keyed by marketplace name, valued by where it points: the CLI derives the
+// name from the source's marketplace.json, so adding a second directory that
+// declares a name already registered silently repoints the existing entry.
+function knownMarketplaceSources() {
+  const known = readJsonSafe(KNOWN_MARKETPLACES_FILE) || {};
+  return Object.fromEntries(Object.entries(known).map(([name, e]) => [name, e?.installLocation || JSON.stringify(e?.source || {})]));
+}
+
+function diffMarketplaces(before, after) {
+  const added = Object.keys(after).find((n) => !(n in before)) || null;
+  const name = Object.keys(after).find((n) => n in before && before[n] !== after[n]);
+  return { added, repointed: name ? { name, from: before[name], to: after[name] } : null };
+}
+
 async function runClaudePlugin(args) {
   for (const arg of args) {
     if (typeof arg !== 'string' || !arg) throw badRequest('Invalid argument');
@@ -837,8 +870,15 @@ async function runClaudePlugin(args) {
   // cwd is re-checked here rather than trusting the value PUT /api/project
   // validated earlier — the directory can be removed or replaced in between.
   const cwd = isExistingDir(projectPath) ? projectPath : undefined;
-  const { stdout } = await execNoShell('claude', ['plugin', ...args], { timeout: 30000, cwd, env: CLI_ENV });
-  return stdout.trim();
+  try {
+    const { stdout } = await execNoShell('claude', ['plugin', ...args], { timeout: 30000, cwd, env: CLI_ENV });
+    return cleanCliOutput(stdout);
+  } catch (err) {
+    // The CLI's own failure text carries the same progress prefix as its
+    // success text, so it is cleaned here rather than in the shared responder.
+    err.message = cleanCliOutput(err.message) || err.message;
+    throw err;
+  }
 }
 
 const { assertPluginId, assertName, assertScope, assertSource, badRequest, isExistingDir } = require('./lib/validate');
@@ -883,9 +923,15 @@ for (const [verb, field, assertArg] of [['add', 'source', assertSource], ['remov
     const value = req.body[field];
     if (!value) return res.status(400).json({ error: `${field} required` });
     try {
+      // `add` exits 0 and prints a message when it registers nothing (source
+      // already known, no marketplace.json) and also when it repoints an
+      // existing name at a different directory, so the registry is what says
+      // what actually happened.
+      const before = verb === 'add' ? knownMarketplaceSources() : null;
       const output = await runClaudePlugin(['marketplace', verb, assertArg(value)]);
       invalidateCache();
-      res.json({ ok: true, output });
+      const diff = before ? diffMarketplaces(before, knownMarketplaceSources()) : null;
+      res.json({ ok: true, output, added: diff?.added || null, repointed: diff?.repointed || null });
     } catch (err) {
       sendError(res, err);
     }

@@ -8,6 +8,8 @@ let heatmapMode = localStorage.getItem('heatmap-mode') === '1';
 let heatSkillsOnly = localStorage.getItem('heat-skills-only') === '1';
 const expandedNodes = new Set();
 let componentCache = {};
+// Which Claude config dir this server reads and writes, from GET /api/project.
+let claudeConfigDir = '';
 const detailHistory = [];
 let focusedRowId = null;
 let _focusedRowEl = null;
@@ -294,11 +296,8 @@ async function putProject(dirPath) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: dirPath }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `${res.status}`);
-  }
-  const { path } = await res.json();
+  const { path, error } = await readJsonOrThrow(res);
+  if (!res.ok) throw new Error(error || `${res.status}`);
   // Only a switch feeds the recents list — never the server's reported path, which may be its cwd
   // fallback (the hub's own directory) rather than anything the user picked.
   saveRecentProject(path);
@@ -1383,12 +1382,12 @@ async function postAndReload(url, body, label) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    const data = await res.json();
+    const data = await readJsonOrThrow(res);
     if (!res.ok) {
       toast(data.error || 'Action failed', 'error');
       return;
     }
-    toast(`${label} successful`, 'success');
+    toast(data.output || `${label} successful`, 'success');
     await loadData();
   } catch (err) {
     toast(err.message, 'error');
@@ -1431,7 +1430,8 @@ function restoreAppState() {
 // directory and not anything the user picked. Resolve the intended scope before the first load.
 async function initProjectScope() {
   const fromUrl = new URLSearchParams(window.location.search).get('project');
-  let { path: current, explicit } = await (await fetch('/api/project')).json();
+  let { path: current, explicit, configDir } = await (await fetch('/api/project')).json();
+  claudeConfigDir = configDir || '';
   // A hub-pushed project outranks the stored recent: the hub posts on iframe load, so hub:project
   // can land before or during this block.
   const desired = fromUrl || hubProjectPath || (explicit ? null : getRecentProjects()[0]);
@@ -1595,6 +1595,7 @@ function closeModal(id) {
 
 function openAddMarketplace() {
   document.getElementById('marketplaceSource').value = '';
+  setAddMarketplaceStatus('');
   renderMarketplaceList();
   document.getElementById('addMarketplaceModal').classList.add('open');
   setTimeout(() => document.getElementById('marketplaceSource').focus(), 100);
@@ -1637,28 +1638,58 @@ async function removeMarketplace(name, btn) {
   btn.disabled = false;
 }
 
+function setAddMarketplaceStatus(msg, type = 'info') {
+  const el = document.getElementById('marketplaceAddStatus');
+  el.textContent = msg;
+  el.className = `mkt-add-status mkt-add-status-${type}`;
+}
+
+async function readJsonOrThrow(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
+  }
+}
+
 async function submitAddMarketplace() {
   const source = document.getElementById('marketplaceSource').value.trim();
   if (!source) return;
   const btn = document.getElementById('addMarketplaceSubmit');
   btn.disabled = true;
   btn.textContent = 'Adding...';
+  setAddMarketplaceStatus('Adding...');
   try {
     const res = await fetch('/api/marketplace/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source }),
     });
-    const data = await res.json();
+    const data = await readJsonOrThrow(res);
     if (!res.ok) {
-      toast(data.error || 'Failed to add marketplace', 'error');
-    } else {
-      toast('Marketplace added', 'success');
-      document.getElementById('marketplaceSource').value = '';
-      await loadData();
+      setAddMarketplaceStatus(data.error || 'Failed to add marketplace', 'error');
+      return;
     }
+    if (data.added) {
+      setAddMarketplaceStatus(data.output || `Added "${data.added}"`, 'success');
+    } else if (data.repointed) {
+      // The name comes from the source's marketplace.json, so a directory that
+      // declares an already-registered name overwrites that entry instead of
+      // adding one. The CLI still reports plain success.
+      const { name, from, to } = data.repointed;
+      setAddMarketplaceStatus(`"${name}" already existed and now points at ${to} (was ${from})`, 'warn');
+    } else {
+      // Nothing changed in the registry, so the CLI's own message is the only
+      // thing that explains why.
+      const msg = data.output || 'Nothing was added — the CLI reported no change';
+      setAddMarketplaceStatus(`${msg}\nRegistry unchanged: ${claudeConfigDir}`, 'warn');
+      return;
+    }
+    document.getElementById('marketplaceSource').value = '';
+    await loadData();
   } catch (err) {
-    toast(err.message, 'error');
+    setAddMarketplaceStatus(err.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Add';
