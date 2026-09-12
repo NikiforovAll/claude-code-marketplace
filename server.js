@@ -6,6 +6,15 @@ const os = require('os');
 const { openInEditor, execNoShell } = require('./lib/open-editor');
 const { createNetGuard } = require('./lib/net-guard');
 const { isContainedAny } = require('./lib/contain');
+const {
+  countComponents,
+  COMPONENT_KEYS,
+  INLINE_PREFIX,
+  findFiles,
+  findReadmeFile,
+  readJsonSafe,
+  toUnixPath,
+} = require('./lib/components');
 
 const app = express();
 
@@ -71,22 +80,6 @@ if (projectPath.startsWith('~')) projectPath = projectPath.replace('~', os.homed
 // replaced by the browser's last-used project at boot.
 let projectExplicit = Boolean(projectArg);
 const PORT = parseInt(getArg('port') || process.env.PORT || '3542', 10);
-
-function toUnixPath(p) {
-  return p ? p.replace(/\\/g, '/') : p;
-}
-
-function readJsonSafe(filePath) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  } catch { return null; }
-}
-
-function findReadmeFile(dirPath) {
-  try {
-    return fs.readdirSync(dirPath).find(f => f.toLowerCase() === 'readme.md') || null;
-  } catch { return null; }
-}
 
 function readJsonKey(filePath, key) {
   const data = readJsonSafe(filePath);
@@ -252,7 +245,7 @@ function loadMarketplaces() {
       let source = pd.source || '';
       if (typeof source === 'object') source = source.url || JSON.stringify(source);
 
-      const compKeys = ['skills', 'commands', 'agents', 'mcpServers', 'hooks', 'lspServers', 'monitors'];
+      const compKeys = COMPONENT_KEYS;
 
       // Resolve origin dir from marketplace source
       let originDir = null;
@@ -311,6 +304,9 @@ function loadMarketplaces() {
       }
       if (fsComps?._configFiles) components._configFiles = fsComps._configFiles;
       if (fsComps?._readmePath) components._readmePath = fsComps._readmePath;
+      // A component the plugin's own manifest declares inline previews the same way one the
+      // marketplace entry declares inline does.
+      Object.assign(inlineConfig, fsComps?._inlineConfig);
       for (const k of Object.keys(inlineConfig)) {
         if (!components._configFiles) components._configFiles = {};
         if (!components._configFiles[k]) components._configFiles[k] = `${INLINE_PREFIX}${k}`;
@@ -376,105 +372,7 @@ function loadMarketplaces() {
   return marketplaces;
 }
 
-const JSON_COMPONENTS = [
-  { key: 'mcpServers', def: '.mcp.json', names: d => Object.keys(d.mcpServers || d) },
-  { key: 'hooks', def: path.join('hooks', 'hooks.json'), names: d => Object.keys(d.hooks || d).filter(k => k !== 'description') },
-  { key: 'lspServers', def: '.lsp.json', names: d => Object.keys(d.lspServers || d) },
-  { key: 'monitors', def: 'monitors.json', names: d => (Array.isArray(d) ? d.map(m => m?.name).filter(Boolean) : []) },
-];
-
-function countComponents(pluginDir, meta = {}) {
-  const result = { skills: [], commands: [], agents: [], mcpServers: [], hooks: [], lspServers: [], monitors: [] };
-  if (!pluginDir || !fs.existsSync(pluginDir)) return result;
-
-  // The marketplace entry (`meta`) wins, but a plugin can also declare component paths in
-  // its own manifest -- the only place monitors are ever declared. existsSync first: the
-  // virtual-marketplace dirs (~/.claude, <project>/.claude) carry no manifest at all.
-  const manifestFile = path.join(pluginDir, '.claude-plugin', 'plugin.json');
-  const manifest = (fs.existsSync(manifestFile) ? readJsonSafe(manifestFile) : null) || {};
-
-  // Skills: check custom paths from metadata, then default
-  const skillPaths = meta.skills
-    ? (Array.isArray(meta.skills) ? meta.skills : [meta.skills])
-    : ['skills'];
-  for (const sp of skillPaths) {
-    const skillsDir = path.resolve(pluginDir, sp);
-    if (fs.existsSync(skillsDir) && fs.statSync(skillsDir).isDirectory()) {
-      try {
-        // If the path points to a skill dir (has SKILL.md), it's a single skill
-        if (fs.existsSync(path.join(skillsDir, 'SKILL.md'))) {
-          result.skills.push(path.basename(skillsDir));
-        } else {
-          // A directory is only a skill if it carries a SKILL.md
-          const dirs = fs.readdirSync(skillsDir).filter(d => {
-            try {
-              return fs.statSync(path.join(skillsDir, d)).isDirectory()
-                && fs.existsSync(path.join(skillsDir, d, 'SKILL.md'));
-            } catch { return false; }
-          });
-          result.skills.push(...dirs);
-        }
-      } catch {}
-    }
-  }
-
-  // Commands: check custom path then default
-  const cmdPath = meta.commands || 'commands';
-  const cmdsDir = path.resolve(pluginDir, cmdPath);
-  if (fs.existsSync(cmdsDir) && fs.statSync(cmdsDir).isDirectory()) {
-    try { result.commands = findFiles(cmdsDir, '.md'); } catch {}
-  }
-
-  // Agents: check custom path then default
-  const agentPath = meta.agents || 'agents';
-  const agentsDir = path.resolve(pluginDir, agentPath);
-  if (fs.existsSync(agentsDir) && fs.statSync(agentsDir).isDirectory()) {
-    try {
-      result.agents = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'));
-    } catch {}
-  }
-
-  const configFiles = {};
-
-  // Each of these is one JSON file whose names we list: same resolve -> read -> extract
-  // shape, differing only in the default path and in how the names sit inside the file.
-  // monitors.json is an array of objects; the rest are maps keyed by name.
-  for (const { key, def, names } of JSON_COMPONENTS) {
-    const declared = meta[key] || manifest.experimental?.[key] || def;
-    const file = path.resolve(pluginDir, declared);
-    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) continue;
-    const data = readJsonSafe(file);
-    if (!data) continue;
-    result[key] = names(data);
-    // normalize before toUnixPath: a manifest writes "./monitors.json", and a leading "./"
-    // survives into the preview URL the client builds from this path.
-    if (result[key].length) configFiles[key] = toUnixPath(path.normalize(declared));
-  }
-
-  const readmeFile = findReadmeFile(pluginDir);
-  if (readmeFile) result._readmePath = readmeFile;
-
-  result._configFiles = configFiles;
-  return result;
-}
-
-function findFiles(dir, ext) {
-  const results = [];
-  try {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        results.push(...findFiles(full, ext));
-      } else if (entry.name.endsWith(ext)) {
-        results.push(entry.name);
-      }
-    }
-  } catch {}
-  return results;
-}
-
 const VIRTUAL_PREFIX = '_custom/';
-const INLINE_PREFIX = '__inline__/';
 const SCOPE_LABELS = { user: 'User Customizations', project: 'Project Customizations' };
 const EMPTY_SCOPE = { installed: false, enabled: false, version: null, installPath: null };
 
