@@ -804,7 +804,7 @@ async function showDetail(pluginId) {
   const updateBanner = plugin.hasUpdate
     ? `<div class="update-banner">
         <span>Update available: <strong>v${esc(plugin.version)}</strong> \u2192 <strong>v${esc(plugin.availableVersion)}</strong></span>
-        <button class="action-btn primary" onclick="runAction('update', '${escAttrJs(plugin.fullId)}')">Update Plugin</button>
+        ${updateButtons(plugin)}
       </div>`
     : '';
 
@@ -854,6 +854,24 @@ async function showDetail(pluginId) {
   const hasDirAccess = !!comps._pluginDir;
   const el = document.getElementById('detailComponents');
   if (el) el.innerHTML = renderDetailComponents(pluginId, comps, hasDirAccess);
+}
+
+// `claude plugin update` updates one install record and defaults to --scope
+// user, so a plugin installed only at project/local scope fails without an
+// explicit scope. One button per stale scope, since scopes can hold different
+// versions.
+function updateButtons(plugin) {
+  const stale = (plugin.installedScopes || []).filter(
+    (s) => plugin.scopeDetails?.[s]?.version !== plugin.availableVersion,
+  );
+  if (!stale.length) return '';
+  const label = stale.length === 1 ? 'Update Plugin' : null;
+  return stale
+    .map(
+      (s) =>
+        `<button class="action-btn primary" onclick="runAction('update', '${escAttrJs(plugin.fullId)}', '${escAttrJs(s)}')">${label || `Update (${esc(s)})`}</button>`,
+    )
+    .join(' ');
 }
 
 function renderScopeMatrix(plugin) {
