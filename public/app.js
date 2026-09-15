@@ -340,12 +340,15 @@ async function loadData() {
       if (userCustom) showDetail('_custom/user');
     }
 
-    // Prefetch components for all plugins in background
+    // Seed the cache from the list response, which already carries `components` and
+    // `_pluginDir` per plugin — exactly what the endpoint answers for a non-virtual
+    // plugin. Only a virtual one needs the request, because the endpoint rescans its
+    // directory. A plugin with no dir has no answer at all, so it stays uncached.
     for (const m of marketplaces) {
       for (const p of m.plugins) {
-        if (!componentCache[p.fullId]) {
-          fetchComponents(p.fullId);
-        }
+        if (componentCache[p.fullId] || !p._pluginDir) continue;
+        if (p.isVirtual) fetchComponents(p.fullId);
+        else componentCache[p.fullId] = { ...p.components, _pluginDir: p._pluginDir };
       }
     }
   } catch (err) {

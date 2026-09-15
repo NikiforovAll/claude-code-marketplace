@@ -604,7 +604,11 @@ app.get('/api/plugins/:pluginId/components', (req, res) => {
     comps._pluginDir = plugin._pluginDir;
     return res.json(comps);
   }
-  if (!plugin?._pluginDir) return res.status(404).json({ error: 'Plugin directory not found', pluginId });
+  if (!plugin) return res.status(404).json({ error: 'Plugin not found', pluginId });
+  // A plugin that is only listed, never fetched, has no local dir. Its declared
+  // components are still the answer; the absent `_pluginDir` is what tells the client
+  // there are no files to browse. A 404 here only reached the browser console.
+  if (!plugin._pluginDir) return res.json({ ...(plugin.components || {}) });
 
   const comps = plugin.components || plugin._fsComps || countComponents(plugin._pluginDir, plugin.metadata);
   res.json({ ...comps, _pluginDir: plugin._pluginDir });
