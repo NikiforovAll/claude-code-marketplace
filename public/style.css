@@ -198,6 +198,10 @@ body {
 .topbar-select:focus {
   box-shadow: 0 0 0 2px var(--accent-dim);
 }
+.topbar-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .topbar-select option {
   background: var(--bg-surface);
   color: var(--text-primary);
@@ -493,6 +497,21 @@ body {
 .tree-label .mkt-name {
   font-weight: 600;
   color: var(--text-primary);
+}
+.tree-hl {
+  background: var(--accent-dim);
+  border-radius: 2px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+/* Keeps a highlighted label as one flex item, so the container's `gap` cannot open
+   up between a <mark> and the rest of the text. Any hl() call site inside a flex
+   row with a gap needs this on its wrapper. */
+.hl-fit {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tree-meta {
   font-size: 11px;
@@ -1066,6 +1085,13 @@ body.light .scope-toggle.local {
 .detail-comp-item.disabled:hover {
   background: none;
   color: var(--text-tertiary);
+}
+/* after the hover and disabled rules: equal specificity, so source order decides */
+.detail-comp-item.search-hit {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  box-shadow: inset 2px 0 0 var(--accent);
+  opacity: 1;
 }
 .readme-comp-item {
   display: flex;

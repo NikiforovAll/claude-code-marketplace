@@ -12,6 +12,10 @@ let componentCache = {};
 let claudeConfigDir = '';
 const detailHistory = [];
 let focusedRowId = null;
+// What the detail panel held before the current search took it over. `undefined`
+// means no search is borrowing the panel; null means nothing was open.
+let preSearchSelection;
+let searchTimer;
 let _focusedRowEl = null;
 let treeContainer;
 
@@ -126,12 +130,17 @@ document.addEventListener('DOMContentLoaded', () => {
   initSidebarResize();
   initDetailHeaderActions();
 
-  let searchTimer;
-  document.getElementById('searchInput').addEventListener('input', (e) => {
+  const search = document.getElementById('searchInput');
+  search.addEventListener('input', (e) => {
     searchFilter = e.target.value.toLowerCase();
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(renderTree, 150);
+    searchTimer = setTimeout(() => {
+      searchTimer = undefined;
+      applySearch();
+    }, 150);
   });
+  // Bound on the input because the global handler returns early on INPUT targets.
+  search.addEventListener('keydown', handleSearchNav);
 
   document.getElementById('scopeFilter').addEventListener('change', (e) => {
     scopeFilter = e.target.value;
@@ -499,6 +508,9 @@ async function submitProjectPicker() {
 
 function renderTree() {
   const container = document.getElementById('treeContainer');
+  const scopeSel = document.getElementById('scopeFilter');
+  scopeSel.disabled = isGlobalSearch();
+  scopeSel.title = scopeSel.disabled ? 'Search covers every scope' : '';
   if (!marketplaces.length) {
     container.innerHTML = '<div class="loading">No marketplaces found</div>';
     return;
@@ -594,7 +606,7 @@ function renderPluginRow(p) {
   const virtualCls = p.isVirtual ? ' virtual' : '';
   const icon = p.isVirtual ? ICONS.gear : ICONS.plugin;
 
-  const desc = `<span class="tree-desc-inline">${p.description ? esc(p.description) : ''}</span>`;
+  const desc = `<span class="tree-desc-inline">${hl(p.description)}</span>`;
   const heat = heatmapMode ? renderHeatBits(p) : { underlay: '', pill: '', title: '' };
 
   const html = `<div class="tree-row${selected}${virtualCls}" data-row-type="plugin" data-row-id="${esc(p.fullId)}"${heat.title} onclick="showDetail('${escAttrJs(p.fullId)}')">
@@ -602,7 +614,7 @@ function renderPluginRow(p) {
     ${heat.pill}
     <span class="tree-indent" style="width:40px"></span>
     <span class="tree-icon">${icon}</span>
-    <span class="tree-label">${esc(p.name)} ${ver} ${updateIndicator}</span>
+    <span class="tree-label">${hl(p.name)} ${ver} ${updateIndicator}</span>
     ${desc}
     ${summary}
     ${scopes}
@@ -780,6 +792,13 @@ function renderCompSummary(plugin) {
   return parts.length ? `<span class="tree-meta">${parts.join(' \u00B7 ')}</span>` : '';
 }
 
+// Takes the label the panel renders, not the raw name: compItemLabel rewrites
+// claudeMd/agentsMd names, so matching the name would flag rows whose visible
+// text has no match in it. Callers gate on isGlobalSearch.
+function compMatchesSearch(label) {
+  return String(label).replace(/\.md$/, '').toLowerCase().includes(searchFilter);
+}
+
 // --- Detail Panel ---
 
 async function showDetail(pluginId) {
@@ -829,7 +848,7 @@ async function showDetail(pluginId) {
 
   panel.innerHTML = `
     <div class="detail-header">
-      <h3>${headerIcon} ${esc(plugin.name)} ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
+      <h3>${headerIcon} <span class="hl-fit">${hl(plugin.name)}</span> ${plugin.version ? `<span class="version">v${esc(plugin.version)}</span>` : ''}</h3>
       <div class="detail-header-actions">
         ${detailHeaderBtns(plugin._pluginDir, plugin._originDir, { pluginId: plugin.fullId })}
         <button class="detail-close" onclick="closeDetail()">\u2715</button>
@@ -838,7 +857,7 @@ async function showDetail(pluginId) {
     <div class="detail-body">
       ${updateBanner}
       <div class="detail-section">
-        <p class="detail-desc">${esc(plugin.description || 'No description')}</p>
+        <p class="detail-desc">${plugin.description ? hl(plugin.description) : 'No description'}</p>
         ${metaRow}
         ${renderPluginMetadata(plugin)}
       </div>
@@ -853,7 +872,10 @@ async function showDetail(pluginId) {
   const comps = (await fetchComponents(pluginId)) || plugin.components || {};
   const hasDirAccess = !!comps._pluginDir;
   const el = document.getElementById('detailComponents');
-  if (el) el.innerHTML = renderDetailComponents(pluginId, comps, hasDirAccess);
+  if (el) {
+    el.innerHTML = renderDetailComponents(pluginId, comps, hasDirAccess);
+    el.querySelector('.detail-comp-item.search-hit')?.scrollIntoView({ block: 'center' });
+  }
 }
 
 // `claude plugin update` updates one install record and defaults to --scope
@@ -917,13 +939,13 @@ function shortUrl(url) {
 function renderPluginMetadata(plugin) {
   const meta = plugin.metadata || {};
   const chips = [];
-  if (meta.category) chips.push(`<span class="meta-tag">${esc(meta.category)}</span>`);
+  if (meta.category) chips.push(`<span class="meta-tag">${hl(meta.category)}</span>`);
   if (meta.author) {
     const name = typeof meta.author === 'object' ? meta.author.name : meta.author;
     if (name) chips.push(`<span class="meta-chip">${esc(name)}</span>`);
   }
   if (meta.tags?.length) {
-    for (const t of meta.tags) chips.push(`<span class="meta-tag">${esc(t)}</span>`);
+    for (const t of meta.tags) chips.push(`<span class="meta-tag">${hl(t)}</span>`);
   }
   const links = [];
   if (meta.homepage) {
@@ -945,6 +967,7 @@ function renderPluginMetadata(plugin) {
 
 function renderDetailComponents(pluginId, comps, hasDirAccess) {
   const configFiles = comps._configFiles || {};
+  const compHits = isGlobalSearch();
   const entries = Object.entries(comps).filter(
     ([k, v]) => !k.startsWith('_') && (Array.isArray(v) ? v.length > 0 : v > 0),
   );
@@ -983,9 +1006,11 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
               ? ` onclick="openContentModal('${escAttrJs(pluginId)}', '${escAttrJs(clickPath)}', '${escAttrJs(type)}')"`
               : '';
             const isFolder = type === 'skills' || type === 'agentSkills';
-            html += `<div class="detail-comp-item${cls}"${click}>
+            const label = compItemLabel(type, name, names.length);
+            const hit = compHits && compMatchesSearch(label) ? ' search-hit' : '';
+            html += `<div class="detail-comp-item${cls}${hit}"${click}>
             <span class="icon">${isFolder ? ICONS.folder : ICONS.file}</span>
-            ${esc(compItemLabel(type, name, names.length))}
+            <span class="hl-fit">${hl(label)}</span>
             ${heatBadgeFor(pluginId, type, name)}
           </div>`;
           }
@@ -1362,6 +1387,12 @@ function closeDetail() {
       return;
     }
   }
+  clearDetail();
+}
+
+// The empty panel without closeDetail's detailHistory pop, for callers that are
+// not going back a step.
+function clearDetail() {
   selectedPluginId = null;
   updateUrl();
   document.querySelectorAll('.tree-row.selected').forEach((r) => r.classList.remove('selected'));
@@ -1427,7 +1458,8 @@ function updateUrl() {
 function restoreAppState() {
   const params = new URLSearchParams(window.location.search);
   if (params.has('q')) {
-    searchFilter = params.get('q');
+    // every matcher compares against a lowercased searchFilter, as the input handler guarantees
+    searchFilter = params.get('q').toLowerCase();
     document.getElementById('searchInput').value = searchFilter;
   }
   if (params.has('scope')) {
@@ -1519,23 +1551,123 @@ function findPlugin(id) {
   return null;
 }
 
+// A short query stays inside the selected scope and matches only the plugin's own
+// fields. At or above this length the search goes global: every scope, and
+// component names too. Keeps a one- or two-letter query from opening everything.
+const GLOBAL_SEARCH_MIN = 3;
+
+function isGlobalSearch() {
+  return searchFilter.length >= GLOBAL_SEARCH_MIN;
+}
+
 function filterPlugins(plugins) {
   let result = plugins;
-  if (scopeFilter === 'installed') {
-    result = result.filter((p) => p.isInstalled);
-  } else if (scopeFilter !== 'all') {
-    result = result.filter((p) => p.scopeDetails[scopeFilter]?.installed);
+  if (!isGlobalSearch()) {
+    if (scopeFilter === 'installed') {
+      result = result.filter((p) => p.isInstalled);
+    } else if (scopeFilter !== 'all') {
+      result = result.filter((p) => p.scopeDetails[scopeFilter]?.installed);
+    }
   }
   if (searchFilter) {
-    result = result.filter(
-      (p) =>
-        p.name.toLowerCase().includes(searchFilter) ||
-        (p.description || '').toLowerCase().includes(searchFilter) ||
-        (p.metadata?.category || '').toLowerCase().includes(searchFilter) ||
-        (p.metadata?.tags || []).some((t) => t.toLowerCase().includes(searchFilter)),
-    );
+    result = result.filter(matchesSearch);
   }
   return result;
+}
+
+function applySearch() {
+  renderTree();
+  syncSearchSelection();
+}
+
+// Renders a keystroke the debounce still owes us, without the selection sync:
+// an arrow key means the user is steering, so the first hit must not be reopened.
+function flushSearchRender() {
+  if (searchTimer === undefined) return;
+  clearTimeout(searchTimer);
+  searchTimer = undefined;
+  renderTree();
+}
+
+function snapshotPreSearch() {
+  if (isGlobalSearch() && preSearchSelection === undefined) preSearchSelection = selectedPluginId;
+}
+
+// Arrow/Ctrl-N keys while the caret is still in the search box, so a query can be
+// walked without reaching for the mouse. Wraps at both ends.
+function stepSearchMatch(delta) {
+  flushSearchRender();
+  snapshotPreSearch();
+  const all = getVisibleRows();
+  const rows = all.filter((r) => r.dataset.rowType === 'plugin');
+  if (!rows.length) return;
+  const current = rows.findIndex((r) => r.dataset.rowId === selectedPluginId);
+  const next = current < 0 ? (delta > 0 ? 0 : rows.length - 1) : (current + delta + rows.length) % rows.length;
+  const row = rows[next];
+  setFocusedRow(all.indexOf(row), all);
+  showDetail(row.dataset.rowId);
+}
+
+function handleSearchNav(e) {
+  const down = e.key === 'ArrowDown' || (e.key === 'n' && e.ctrlKey);
+  const up = e.key === 'ArrowUp' || (e.key === 'p' && e.ctrlKey);
+  if (!down && !up) return;
+  e.preventDefault();
+  e.stopPropagation();
+  stepSearchMatch(down ? 1 : -1);
+}
+
+// The rendered tree is the authority on match order, so read the first hit off it
+// rather than filtering every plugin a second time and hoping the two orderings
+// stay in agreement.
+function firstSearchRow() {
+  return getVisibleRows().find((r) => r.dataset.rowType === 'plugin') || null;
+}
+
+// Opens the first hit so its highlighted component is visible without a click,
+// and puts the panel back the way the user left it once the query drops below
+// GLOBAL_SEARCH_MIN. Re-renders even when the target is unchanged, so stale
+// highlights don't linger.
+function syncSearchSelection() {
+  if (isGlobalSearch()) {
+    snapshotPreSearch();
+    const row = firstSearchRow();
+    if (row) {
+      showDetail(row.dataset.rowId);
+      scrollRowIntoView(row);
+    } else if (selectedPluginId) {
+      clearDetail();
+    }
+    return;
+  }
+  // No snapshot means the query came from the URL, so there is nothing to go back
+  // to — but the open panel still carries highlights and has to be re-rendered.
+  const prev = preSearchSelection === undefined ? selectedPluginId : preSearchSelection;
+  preSearchSelection = undefined;
+  if (prev && findPlugin(prev)) showDetail(prev);
+  else if (selectedPluginId) clearDetail();
+}
+
+function matchesSearch(p) {
+  return (
+    p.name.toLowerCase().includes(searchFilter) ||
+    (p.description || '').toLowerCase().includes(searchFilter) ||
+    (p.metadata?.category || '').toLowerCase().includes(searchFilter) ||
+    (p.metadata?.tags || []).some((t) => t.toLowerCase().includes(searchFilter)) ||
+    hasCompMatch(p)
+  );
+}
+
+// Mirrors what renderDetailComponents lists, label rewrites included, so a plugin
+// matched here always has a highlighted row waiting in the detail panel.
+function hasCompMatch(p) {
+  if (!isGlobalSearch() || !p.components) return false;
+  return Object.entries(p.components).some(
+    ([key, value]) =>
+      !key.startsWith('_') &&
+      Array.isArray(value) &&
+      value.some((name) => compMatchesSearch(compItemLabel(key, name, value.length))),
+  );
 }
 
 function sourceDetail(m) {
@@ -1574,6 +1706,24 @@ const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'
 function esc(str) {
   if (str == null) return '';
   return String(str).replace(/[&<>"'`]/g, (c) => HTML_ESCAPES[c]);
+}
+
+// Escapes each slice around the matches rather than escaping the whole string first,
+// so a query containing & < > still lines up with the text it matched.
+function hl(str) {
+  const raw = str == null ? '' : String(str);
+  if (!searchFilter) return esc(raw);
+  const lower = raw.toLowerCase();
+  let out = '';
+  let from = 0;
+  for (;;) {
+    const at = lower.indexOf(searchFilter, from);
+    if (at === -1) break;
+    const stop = at + searchFilter.length;
+    out += `${esc(raw.slice(from, at))}<mark class="tree-hl">${esc(raw.slice(at, stop))}</mark>`;
+    from = stop;
+  }
+  return out + esc(raw.slice(from));
 }
 
 // For a value landing inside a quoted JS string inside an HTML attribute —
@@ -1764,6 +1914,7 @@ function handleKeydown(e) {
     if (e.key === 'Escape') {
       e.target.blur();
       e.preventDefault();
+      return;
     }
     return;
   }
@@ -1937,6 +2088,9 @@ const SHORTCUT_PAIRS = [
       title: 'Find',
       rows: [
         { keys: ['/'], label: 'Focus search' },
+        { keys: ['↓', '↑'], label: 'Next / previous match, while typing' },
+        { keys: ['Ctrl', 'N'], label: 'Next match, while typing', combo: true },
+        { keys: ['Ctrl', 'P'], label: 'Previous match, while typing', combo: true },
         { keys: ['S'], label: 'Focus scope filter' },
         { keys: ['Esc'], label: 'Close panel / blur input' },
       ],
