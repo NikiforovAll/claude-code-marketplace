@@ -813,7 +813,7 @@ async function showDetail(pluginId) {
   if (row) row.classList.add('selected');
 
   const panel = document.getElementById('detailPanel');
-  const marketplace = marketplaces.find((m) => m.plugins.some((p) => p.fullId === pluginId));
+  const marketplace = findMarketplaceOf(pluginId);
   const mName = marketplace?.name || '?';
   const isVirtual = plugin.isVirtual;
 
@@ -1551,6 +1551,10 @@ function findPlugin(id) {
   return null;
 }
 
+function findMarketplaceOf(id) {
+  return marketplaces.find((m) => m.plugins.some((p) => p.fullId === id)) || null;
+}
+
 // A short query stays inside the selected scope and matches only the plugin's own
 // fields. At or above this length the search goes global: every scope, and
 // component names too. Keeps a one- or two-letter query from opening everything.
@@ -1608,7 +1612,43 @@ function stepSearchMatch(delta) {
   showDetail(row.dataset.rowId);
 }
 
+// Enter ends the search but keeps the hit the user walked to: the query is
+// dropped, the plugin stays open and holds tree focus, and any filter that would
+// hide it again is relaxed so the next arrow key continues from that row.
+function commitSearchMatch() {
+  flushSearchRender();
+  const id = selectedPluginId || firstSearchRow()?.dataset.rowId;
+  const input = document.getElementById('searchInput');
+  input.value = '';
+  input.blur();
+  searchFilter = '';
+  // The row the user walked to becomes the restore target, so the shared
+  // below-threshold path in syncSearchSelection reopens it.
+  preSearchSelection = id;
+  if (id) {
+    const m = findMarketplaceOf(id);
+    if (m) {
+      expandedNodes.add(`m_${safeId(m.name)}`);
+      saveExpandedNodes();
+      const plugin = m.plugins.find((p) => p.fullId === id);
+      if (plugin && !filterPlugins([plugin]).length) {
+        scopeFilter = 'all';
+        document.getElementById('scopeFilter').value = 'all';
+      }
+    }
+    focusedRowId = id;
+  }
+  applySearch();
+  if (_focusedRowEl) scrollRowIntoView(_focusedRowEl);
+}
+
 function handleSearchNav(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    e.stopPropagation();
+    commitSearchMatch();
+    return;
+  }
   const down = e.key === 'ArrowDown' || (e.key === 'n' && e.ctrlKey);
   const up = e.key === 'ArrowUp' || (e.key === 'p' && e.ctrlKey);
   if (!down && !up) return;
@@ -2091,6 +2131,7 @@ const SHORTCUT_PAIRS = [
         { keys: ['↓', '↑'], label: 'Next / previous match, while typing' },
         { keys: ['Ctrl', 'N'], label: 'Next match, while typing', combo: true },
         { keys: ['Ctrl', 'P'], label: 'Previous match, while typing', combo: true },
+        { keys: ['Enter'], label: 'Clear search, keep the match focused' },
         { keys: ['S'], label: 'Focus scope filter' },
         { keys: ['Esc'], label: 'Close panel / blur input' },
       ],
