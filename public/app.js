@@ -189,6 +189,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   bindModalKeys('marketplaceSource', 'addMarketplaceModal', submitAddMarketplace);
+  onEscapeBlur(document.getElementById('marketplaceSource'), document.getElementById('addMarketplaceModal'), () =>
+    closeModal('addMarketplaceModal'),
+  );
   initProjectPicker();
 
   const savedTheme = localStorage.getItem('theme');
@@ -508,6 +511,9 @@ function initProjectPicker() {
     e.preventDefault();
     e.stopPropagation();
   });
+  const modal = document.getElementById('projectPickerModal');
+  onEscapeBlur(filter, modal, () => closeModal('projectPickerModal'));
+  onEscapeBlur(document.getElementById('projectPathInput'), modal, () => setPickerMode(false));
 }
 
 async function submitProjectPicker() {
@@ -1824,6 +1830,22 @@ function toast(msg, type = 'info') {
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
+}
+
+// Vimium eats Escape inside a text input and only blurs it, so the page never sees the key.
+// A blur that no click in the modal caused, while the window keeps focus and the input is
+// still shown, is that Escape.
+function onEscapeBlur(input, modal, handler) {
+  let pointerDown = false;
+  modal.addEventListener('mousedown', () => {
+    pointerDown = true;
+  });
+  document.addEventListener('mouseup', () => {
+    pointerDown = false;
+  });
+  input.addEventListener('blur', () => {
+    if (!pointerDown && document.hasFocus() && input.checkVisibility()) handler();
+  });
 }
 
 function openAddMarketplace() {
