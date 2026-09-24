@@ -86,11 +86,37 @@ function readJsonKey(filePath, key) {
   return data ? (data[key] || {}) : {};
 }
 
+const INSTALLED_PLUGINS_FILE = path.join(PLUGINS_DIR, 'installed_plugins.json');
+
+function isProjectRecord(inst, resolvedRoot) {
+  return typeof inst.projectPath === 'string' && path.resolve(inst.projectPath) === resolvedRoot;
+}
+
+// Inside a git repo, `claude plugin update --scope project|local` does not pick
+// the record whose projectPath equals cwd; it takes the first record of that
+// scope. A worktree record (<project>/.claude/worktrees/x) listed first makes the
+// CLI check that one and report "already at the latest version". Moving this
+// project's record to the front makes the CLI pick it. Uninstall matches
+// correctly. Verified against Claude Code 2.1.281.
+function promoteProjectRecord(pluginId, scope) {
+  if (scope !== 'project' && scope !== 'local') return;
+  const data = readJsonSafe(INSTALLED_PLUGINS_FILE);
+  const records = data?.plugins?.[pluginId];
+  if (!Array.isArray(records)) return;
+  const root = path.resolve(projectPath);
+  const idx = records.findIndex((r) => r.scope === scope && isProjectRecord(r, root));
+  const firstOfScope = records.findIndex((r) => r.scope === scope);
+  if (idx <= firstOfScope) return;
+  records.unshift(...records.splice(idx, 1));
+  const tmp = `${INSTALLED_PLUGINS_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, INSTALLED_PLUGINS_FILE);
+}
+
 // --- Data loading (ported from lazyclaude) ---
 
 function loadRegistry() {
-  const v2File = path.join(PLUGINS_DIR, 'installed_plugins.json');
-  const v2Data = readJsonSafe(v2File);
+  const v2Data = readJsonSafe(INSTALLED_PLUGINS_FILE);
   const installed = {};
   if (v2Data && v2Data.plugins) {
     for (const [pluginId, installations] of Object.entries(v2Data.plugins)) {
@@ -139,15 +165,10 @@ function buildScopeData(registry) {
         scopes.push('user');
       } else if (scope === 'project' || scope === 'local') {
         if (resolvedRoot && inst.projectPath) {
-          try {
-            if (path.resolve(inst.projectPath) === resolvedRoot) {
-              projectInstalledIds.add(pid);
-              scopes.push(scope);
-            }
-          } catch {}
-        } else {
-          scopes.push(scope);
+          if (!isProjectRecord(inst, resolvedRoot)) continue;
+          projectInstalledIds.add(pid);
         }
+        scopes.push(scope);
       }
       if (inst.installPath) {
         scopeInstallPaths[pid][scope] = inst.installPath;
@@ -809,6 +830,7 @@ for (const verb of ['install', 'uninstall', 'enable', 'disable', 'update']) {
       const args = [verb, assertPluginId(pluginId)];
       const validScope = assertScope(scope);
       if (validScope) args.push('--scope', validScope);
+      if (verb === 'update') promoteProjectRecord(pluginId, validScope);
       const output = await runClaudePlugin(args);
       invalidateCache();
       res.json({ ok: true, output });
