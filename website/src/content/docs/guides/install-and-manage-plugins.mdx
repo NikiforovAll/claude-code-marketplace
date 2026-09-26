@@ -1,0 +1,90 @@
+---
+title: Install, enable, and remove plugins
+description: Install, disable, enable, update, and remove plugins in user, project, or local scope from the plugin detail panel or the tree.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+Each button runs the `claude plugin` CLI, then reads the result back from disk. Claude Code Marketplace does not write the settings files. The one exception: before a project or local update, it moves this project's record to the front in `installed_plugins.json`, so the CLI updates the correct record. Claude Code must be on your PATH.
+
+## Scopes
+
+A plugin can be installed in three scopes. Each scope has its own install record and its own enabled state.
+
+| Scope | Enabled state is read from |
+| --- | --- |
+| user | `<configDir>/settings.json` |
+| project | `<project>/.claude/settings.json` |
+| local | `<project>/.claude/settings.local.json` |
+
+`<configDir>` is your Claude config dir, `~/.claude` by default. Install records for all scopes come from `<configDir>/plugins/installed_plugins.json`.
+
+Each settings file keeps an `enabledPlugins` map. An installed plugin counts as enabled unless its entry in that map is `false`.
+
+## Choose the project first
+
+Project and local installs belong to one project path. A project or local record counts only when its project path is the current project. Records for other projects do not show. A record with no project path shows in every project.
+
+Before you install in project or local scope, pick the project. Click the folder button in the top bar, or press <kbd>Shift+P</kbd>, and choose a recent project or add a path. The path must be an existing directory. See [Configuration and CLI](/claude-code-marketplace/reference/configuration/) for the config dir.
+
+## Use the scope matrix
+
+Select a plugin to open its detail panel. The **Scope Installation** section has one row for each scope.
+
+<Shot themed="h1b-hub-marketplace-plugin" alt="Plugin detail panel with the update banner, the Scope Installation matrix, and the component list" />
+
+| Status in the row | Buttons |
+| --- | --- |
+| Not installed | **Install** |
+| Enabled · vX | **Disable**, **Remove** |
+| Disabled · vX | **Enable**, **Remove** |
+
+**Remove** uninstalls the plugin from that scope only. The other scopes do not change.
+
+## Use the U, P, and L badges
+
+Each plugin row in the tree has three badges: **U** (user), **P** (project), and **L** (local). One click acts on that scope:
+
+- Not installed: installs the plugin.
+- Enabled: disables it.
+- Disabled: enables it.
+
+Hover a badge to see its state, for example `project: enabled (v1.2.0)`, `local: disabled (v1.2.0)`, or `user: not installed`.
+
+The badges cannot uninstall. To remove a plugin, use **Remove** in the detail panel.
+
+## What each action runs
+
+Every button and badge runs this command:
+
+```bash
+claude plugin <install|uninstall|enable|disable|update> <name@marketplace> --scope <user|project|local>
+```
+
+The command runs in the current project directory, with a 30 second timeout. With a custom config dir, `CLAUDE_CONFIG_DIR` is set to that dir, so the CLI writes to the same files the app reads.
+
+There is no confirm dialog. A toast shows `Running <action>...`. When the command ends, a second toast shows the CLI output, or the error. If the CLI prints nothing, the toast shows `<action> successful`. The toasts use the CLI verb, so **Remove** shows `Running uninstall...`. After a success, the app reloads its data.
+
+## Update a plugin
+
+The catalog version is the `version` in the marketplace entry. If the entry has no version, the app reads it from the plugin's `.claude-plugin/plugin.json`.
+
+The app flags an update when the catalog version is newer than the installed version of the first scope that has one, checked in the order user, project, local. The tree row shows an up arrow, and the detail panel shows a banner: `Update available: vX → vY`. A new version in user scope can hide an old version in project or local scope: then the app shows no arrow and no banner.
+
+When the banner shows, each installed scope whose version is different from the catalog version gets a button:
+
+- If one scope has a different version, the banner has one **Update Plugin** button.
+- If more than one scope has a different version, the banner has one **Update (&lt;scope&gt;)** button for each of them.
+
+Each button runs `claude plugin update` with an explicit `--scope`. The CLI uses user scope when you give no scope, so a plugin installed only in project or local scope needs the scope.
+
+To get new versions into the catalog first, update the marketplace. See [Add and manage marketplaces](/claude-code-marketplace/guides/add-a-marketplace/).
+
+## Customization entries
+
+**User Customizations** and **Project Customizations** at the top of the tree are not plugins. They list files from your config dir and from `<project>/.claude`. They have no badges and no scope matrix, and the server refuses any action on them with `Cannot modify virtual customization entries`. See [Browse and search plugins](/claude-code-marketplace/guides/browse-and-search/).
+
+If an action fails or the state looks wrong, see [Troubleshooting](/claude-code-marketplace/reference/troubleshooting/).
+
+<Lightbox />

@@ -1,0 +1,128 @@
+---
+title: Configuration and CLI
+description: Command-line flags, environment variables, the files Claude Code Marketplace reads, themes, and network security.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+Claude Code Marketplace is one Node.js server (`server.js`) that needs Node.js 18 or later. Start it with `npx claude-code-marketplace`. From a clone, `npm start` runs the server and `npm run dev` runs it with `--open`.
+
+## Command-line flags
+
+| Flag | Env var | Default | What it does |
+| --- | --- | --- | --- |
+| `--port <n>` | `PORT` | `3542` | Port to listen on. If the port is in use, the server logs `Port N in use, trying random port...` and listens on a free port. |
+| `--dir <path>` | `CLAUDE_CONFIG_DIR`, then `CLAUDE_DIR` | `~/.claude` | Claude config dir to read and write. |
+| `--project <path>` | none | current working directory | Starting project for project and local scope. To change it, use the project picker. See [Switch the project](#switch-the-project). |
+| `--open` | none | off | Opens `http://localhost:<port>` in your browser when the server is ready. |
+| `--host <addr>` | `HOST` | `127.0.0.1` | Address to bind. See [Network security](#network-security). |
+| `--allowed-hosts <list>` | `ALLOWED_HOSTS` | empty | Comma-separated extra `Host` header names to accept. |
+
+A flag takes its value as the next argument (`--port 4000`) or after an equals sign (`--port=4000`). A leading `~` in `--dir` and `--project` expands to your home directory.
+
+When the server starts, it prints the address it listens on:
+
+```text
+Claude Code Marketplace running at http://localhost:3542
+```
+
+The address uses the real port, so it is correct after a fallback to a random port.
+
+## Environment variables
+
+| Variable | What it does |
+| --- | --- |
+| `EDITOR` | Editor for the **Open in VS Code** buttons and the <kbd>E</kbd> key. The default is `code`. The editor must be on your `PATH`, or you get `Editor not found on PATH`. Editors in the VS Code family (`code`, `code-insiders`, `codium`, `vscodium`, `cursor`, `windsurf`, `positron`, `trae`) get `-n` to open a new window. |
+| `CLAUDE_HUB` | Set by Claude Code Hub. Turns on hub integration. |
+| `HUB_URL` | Set by Claude Code Hub. The hub origin is accepted as a request origin and as a frame parent. |
+
+For `CLAUDE_HUB` and `HUB_URL`, see [Run inside Claude Code Hub](/claude-code-marketplace/reference/claude-code-hub/).
+
+## Config dir
+
+The server picks the Claude config dir in this order:
+
+1. `--dir <path>`
+2. `CLAUDE_CONFIG_DIR`
+3. `CLAUDE_DIR`
+4. `~/.claude`
+
+The server reads the config dir once at startup. To use a different dir, restart the server with a different value.
+
+Install, remove, enable, disable, and update run the `claude plugin` CLI. The server passes the config dir to the CLI, so the CLI writes to the same registry the page reads:
+
+- With a custom dir, the CLI runs with `CLAUDE_CONFIG_DIR` set to that dir.
+- With the default dir, the server removes `CLAUDE_CONFIG_DIR` and `CLAUDE_DIR` from the CLI environment. A value that the shell sets for other tools does not send CLI writes to a different registry.
+
+## Files read
+
+| File | What it gives |
+| --- | --- |
+| `<config dir>/plugins/known_marketplaces.json` | The registered marketplaces. If this file is missing, no marketplaces show. |
+| `<config dir>/plugins/installed_plugins.json` | Install records per scope. Project and local records count only for the current project. |
+| `<install location>/.claude-plugin/marketplace.json` | The plugin catalog of each marketplace. If it is missing, the marketplace has no plugins, and the `/api/marketplaces` response carries `marketplace.json not found at <path>`. |
+| `<config dir>/settings.json` | `enabledPlugins` for user scope. |
+| `<project>/.claude/settings.json` | `enabledPlugins` for project scope. |
+| `<project>/.claude/settings.local.json` | `enabledPlugins` for local scope. |
+| `~/.claude.json` (default dir) or `<config dir>/.claude.json` (custom dir) | `skillUsage` and `pluginUsage` for the usage heatmap. |
+
+An installed plugin counts as enabled unless `enabledPlugins` sets it to `false`.
+
+The server keeps marketplace data in memory. It clears that cache after each plugin or marketplace action, after a project change, and when you select **Refresh** or press <kbd>R</kbd>. If you edit these files by hand, refresh to see the change.
+
+## Switch the project
+
+Project and local scope apply to one project directory. To pick it, select the folder button in the top bar, which shows the current project path, or press <kbd>Shift+P</kbd>. The **Switch Project** picker opens:
+
+- The list shows up to 20 recent projects. Each config dir has its own list. The current project has the `current` tag. Select **X** on a row to remove it from the list.
+- Type to filter the list, then pick a project. For the picker keys, see [Project picker](/claude-code-marketplace/reference/keyboard-shortcuts/#project-picker).
+- Select **+ Add path...**, type a directory, and select **Switch**.
+
+The path must be an existing directory, or you get `Directory does not exist`. After a switch, the page shows `Project switched` and loads the data for the new project.
+
+When the page loads, it picks the project in this order:
+
+1. The project that Claude Code Hub sends, when the page runs inside the hub.
+2. A `?project=<path>` URL parameter.
+3. The `--project` flag, if you started the server with it.
+4. The most recent project in the picker list.
+5. The directory where you started the server.
+
+## Themes and layout
+
+<Shot themed="marketplace" alt="Claude Code Marketplace with the top bar, the marketplace tree on the left, and the plugin detail panel on the right" />
+
+The top bar has a light/dark toggle, and <kbd>T</kbd> switches it too. Without a saved choice, the page follows the light or dark setting of your OS.
+
+The color theme picker has 17 themes. Each one has a light and a dark variant: Ember (default), Gruvbox, Catppuccin, Tokyo Night, Solarized, Dracula, Nord, Rosé Pine, Everforest, Kanagawa, One Dark, Night Owl, Monokai Pro, GitHub, Ayu, Vitesse, and Synthwave '84.
+
+To change the width of the tree panel, drag the handle between the tree and the detail panel. The minimum width is 200 px, and the detail panel keeps its own minimum width.
+
+The browser keeps the theme, the color theme, and the panel width in local storage. They apply to this browser only.
+
+## Network security
+
+Claude Code Marketplace has no authentication. Anyone who can send it a request can install and remove plugins as you. These guards limit who can send a request:
+
+- **Loopback bind.** The server binds `127.0.0.1` by default and also listens on `::1` on the same port.
+- **Host allowlist.** The server accepts only requests whose `Host` header is a loopback name, a name in `--allowed-hosts`, or the address from `--host`. Other requests get a 403 page. This blocks DNS rebinding, where a website points its own hostname at `127.0.0.1` to read local data.
+- **Origin checks.** A request other than `GET`, `HEAD`, or `OPTIONS` gets a 403 if its `Origin` is not a loopback address on the same port or the hub origin. A request without `Origin` gets a 403 if its `Sec-Fetch-Site` header has a value other than `same-origin` or `none`.
+- **Frame rules.** Standalone, no page can put the app in a frame. Inside the hub, the rules allow local frames. See [Framing rules](/claude-code-marketplace/reference/claude-code-hub/#framing-rules).
+- **CLI argument checks.** Before a call reaches `claude`, the server checks each argument. A plugin id must match `name` or `name@marketplace`. A scope must be `user`, `project`, or `local`. The only option the server passes on is `--scope`. The server runs the CLI without a shell and stops it after 30 seconds.
+
+To reach the server from another machine, bind a non-loopback address and allow the name you use to reach it:
+
+```bash
+npx claude-code-marketplace --host 0.0.0.0 --allowed-hosts=my-box.local
+```
+
+The server then prints:
+
+```text
+WARNING: listening on 0.0.0.0 - reachable from your network, with no authentication.
+```
+
+Do this only on a network you trust.
+
+<Lightbox />

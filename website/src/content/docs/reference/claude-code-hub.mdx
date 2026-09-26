@@ -1,0 +1,64 @@
+---
+title: Run inside Claude Code Hub
+description: What changes when Claude Code Marketplace runs as a tab of Claude Code Hub.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+Claude Code Hub puts several Claude Code tools in one window, one tab per app. Claude Code Marketplace is one of those tabs. The app works the same as it does standalone, with a few additions for keys, theme, and project.
+
+<Shot themed="h1-hub-marketplace" alt="Claude Code Marketplace open as a tab inside Claude Code Hub" />
+
+## How the hub starts the app
+
+The hub starts Claude Code Marketplace as a child process and sets three environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `CLAUDE_HUB` | `1`. Sets `enabled` in the hub settings, which turns on hub mode in the page. |
+| `HUB_URL` | The hub address, for example `http://localhost:3540`. It also controls the framing rules and the accepted `Origin`. |
+| `CLAUDE_CONFIG_DIR` | The Claude config dir that is active in the hub. |
+
+The app reads the config dir once at startup. When you switch the config dir in the hub, the hub uses a different Claude Code Marketplace process for that dir.
+
+The page asks the server for its hub settings at `GET /hub-config`. The answer is `{"enabled": true, "url": "<HUB_URL>"}` in hub mode. Standalone, `enabled` is `false` and `url` is `null`, and none of the changes on this page apply.
+
+## Keys the app sends to the hub
+
+A key press inside a tab does not reach the hub window by itself. In hub mode, Claude Code Marketplace sends these keys to the hub:
+
+- <kbd>Ctrl+Alt+Left</kbd> and <kbd>Ctrl+Alt+Right</kbd>
+- <kbd>Ctrl+Alt</kbd> plus any letter, with no <kbd>Shift</kbd>
+- <kbd>Alt+1</kbd> to <kbd>Alt+9</kbd>, with no <kbd>Ctrl</kbd> or <kbd>Shift</kbd>
+
+The hub acts on these keys and ignores the rest:
+
+| Key | Hub action |
+| --- | --- |
+| <kbd>Ctrl+Alt+Left</kbd> / <kbd>Ctrl+Alt+Right</kbd> | Go to the previous or next hub app. |
+| <kbd>Alt+1</kbd> to <kbd>Alt+9</kbd> | Go to the hub app with that number. |
+| <kbd>Ctrl+Alt+P</kbd> | Open the hub project picker. |
+| <kbd>Ctrl+Alt+W</kbd> | Open the hub config-dir picker. |
+
+The help overlay (<kbd>?</kbd>) shows a Hub group with the first three rows. It does not list <kbd>Ctrl+Alt+W</kbd>. Standalone, the Hub group is hidden, because the keys do nothing there. See [Keyboard shortcuts](/claude-code-marketplace/reference/keyboard-shortcuts/) for the keys of the app itself.
+
+## Theme
+
+The light or dark mode and the color theme sync with the other hub apps in both directions. Change the theme in Claude Code Marketplace, and the other apps follow. Change it in another app, and Claude Code Marketplace follows.
+
+## Project
+
+The hub project picker (<kbd>Ctrl+Alt+P</kbd>) sets the project for all hub apps. When you pick a project there, Claude Code Marketplace switches to it and reloads its data. Project and local scope then refer to that project. The hub choice wins over the last project that the app remembers.
+
+You can still use the app's own project picker, the folder button in the top bar or <kbd>Shift+P</kbd>. See [Install, enable, and remove plugins](/claude-code-marketplace/guides/install-and-manage-plugins/) for what the scopes do.
+
+## Framing rules
+
+Standalone, the server sends `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY`, so no page can put the app in a frame.
+
+When `HUB_URL` is set, the server sends `frame-ancestors 'self' http://localhost:* http://127.0.0.1:*`, and drops `X-Frame-Options`. If the hub address is not on `localhost` or `127.0.0.1`, the server adds the hub origin to that list. The server also accepts requests that carry the hub origin in the `Origin` header.
+
+The page sends and accepts hub messages only for the hub origin. It ignores messages that do not come from its parent window.
+
+<Lightbox />

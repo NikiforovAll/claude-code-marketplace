@@ -1,0 +1,140 @@
+---
+title: Browse and search plugins
+description: Find plugins with the tree, the scope filter, and search, then read their details in the side panel.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+The left panel is a tree of your registered marketplaces and their plugins. Click a plugin to open its details in the right panel. When nothing is selected, the right panel says "Select a plugin to view details".
+
+<Shot themed="h1-hub-marketplace" alt="Claude Code Marketplace with the marketplace tree on the left and a plugin detail panel on the right" />
+
+## Read the tree
+
+Each marketplace row shows:
+
+- The marketplace name and version.
+- A source badge: **GitHub**, **Local**, or **Git**.
+- The number of plugins that the current filter shows.
+- An **N update(s)** badge when plugins in it have a newer version.
+- A **Marketplace info** button (three dots) that opens the marketplace in the detail panel.
+
+Click a marketplace row to expand or collapse it. The **Expand All** / **Collapse All** toggle at the top of the tree acts on all marketplaces. The app remembers which marketplaces you expanded, in your browser.
+
+Each plugin row shows:
+
+- The plugin name and version.
+- An up arrow when an update is available. Its tooltip reads "Update available: vX → vY".
+- The plugin description.
+- A summary of its components, for example "3 skills · 1 hooks".
+- Three scope badges, **U**, **P**, and **L**, for user, project, and local scope. To install or toggle a plugin from these badges, see [Install, enable, and remove plugins](/claude-code-marketplace/guides/install-and-manage-plugins/).
+
+## Filter by scope
+
+The scope filter in the top bar sets which plugins the tree shows. Press <kbd>S</kbd> to focus it.
+
+| Option | Shows |
+| --- | --- |
+| Installed (default) | Plugins installed in any scope |
+| All | Every plugin in every marketplace |
+| User | Plugins installed in user scope |
+| Project | Plugins installed in project scope for the current project |
+| Local | Plugins installed in local scope for the current project |
+
+With any option other than **All**, or while a search is active, the tree hides marketplaces that have no matching plugins. Project and local scope follow the current project. To change it, click the folder button in the top bar or press <kbd>Shift+P</kbd>.
+
+## Search
+
+Type in the **Filter plugins...** box, or press <kbd>/</kbd> to focus it. The search matches the plugin name, description, category, and tags. It ignores case. The tree updates 150 ms after you stop typing, expands the marketplaces that have matches, and highlights the matched text.
+
+<Shot themed="h1d-hub-marketplace-search" alt="A search query in the top bar, with matching plugins highlighted in the tree and the first match open in the detail panel" />
+
+### Short and global queries
+
+A query of one or two characters stays inside the selected scope and matches only the plugin's own fields.
+
+A query of three or more characters is global:
+
+- It ignores the scope filter. The filter is disabled and its tooltip reads "Search covers every scope".
+- It also matches component names, such as skill, command, and agent names.
+- The first matching plugin opens in the detail panel. The matching component row is highlighted and scrolled into view.
+
+If you shorten the query below three characters, the panel goes back to the plugin you had open before the search.
+
+### Walk the matches
+
+While the cursor is in the search box:
+
+- <kbd>↓</kbd> or <kbd>Ctrl+N</kbd> opens the next matching plugin.
+- <kbd>↑</kbd> or <kbd>Ctrl+P</kbd> opens the previous matching plugin.
+- The steps wrap from the last match to the first, and back.
+- <kbd>Enter</kbd> clears the query and keeps the current match open and focused in the tree. It expands the plugin's marketplace. If the scope filter would hide the plugin, the filter changes to **All**.
+
+After <kbd>Enter</kbd>, the tree keys work from that row. See [Keyboard shortcuts](/claude-code-marketplace/reference/keyboard-shortcuts/).
+
+## Plugin details
+
+Click a plugin row, or focus it and press <kbd>Enter</kbd>, to open the detail panel. The panel has these parts, from top to bottom:
+
+- **Header.** The name and version, and buttons to copy the plugin path, copy the source (when it is different from the path), and **Open in VS Code**. The X button closes the panel. <kbd>Esc</kbd> also closes it.
+- **Update banner.** Shown when an update is available, with the update buttons.
+- **Description.** The plugin description, or "No description".
+- **Origin.** "from &lt;marketplace&gt;" and the marketplace source badge.
+- **Metadata.** Chips for category, author, and tags, and links to the homepage and the source URL, when the plugin declares them.
+- **Scope Installation.** One row each for user, project, and local scope, with the install state and the actions.
+- **Components.** Skills, commands, agents, MCP servers, hooks, and the other component groups, each with a count and a list.
+
+Click a component to open its files. See [Preview plugins and skills](/claude-code-marketplace/guides/preview-plugins-and-skills/).
+
+## Marketplace details
+
+Click the **Marketplace info** button (three dots) on a marketplace row to open **Marketplace info**. It shows:
+
+- Source, Version, Owner, Description, Location, and Last updated.
+- **Plugins**: "N installed / M total".
+- **Documentation**: the marketplace README, when it has one.
+- **Actions**: **Update** and **Remove**.
+- A list of its plugins, each marked enabled, disabled, or not installed. Click a plugin to open it. When you close that plugin, the panel goes back to the marketplace.
+
+For more on update and remove, see [Add and manage marketplaces](/claude-code-marketplace/guides/add-a-marketplace/).
+
+## Your own customizations
+
+Two virtual marketplaces sit at the top of the tree:
+
+- **User Customizations** lists what is in your Claude config dir, for example `~/.claude/`.
+- **Project Customizations** lists what is in `<project>/.claude/` for the current project.
+
+They list skills, commands, agents, hooks, MCP servers, settings files, and `CLAUDE.md`. Project Customizations also lists the `CLAUDE.md` and `AGENTS.md` in the project root. Skills in `.agents/skills` show as **Agent Skills (not-supported)**.
+
+A virtual marketplace has a gear icon and no source badge. Its entries have no scope badges, and the detail panel marks them with a **Custom** badge. You can view and preview them, but you cannot install, remove, enable, or disable them. A virtual marketplace shows only when it contains components.
+
+When the app first loads with no plugin selected, it opens User Customizations in the detail panel.
+
+## Share a view with a URL
+
+The address bar keeps the current view, so you can reload the page or send a link:
+
+| Parameter | Holds |
+| --- | --- |
+| `?q=` | The search query |
+| `?scope=` | The scope filter, when it is not Installed |
+| `?plugin=` | The selected plugin id, for example `name@marketplace` |
+| `?project=` | A project path to switch to when the page loads |
+
+The app writes `q`, `scope`, and `plugin` as you work. It reads `project` only on load. Add it by hand to open a link in a given project.
+
+## Usage heatmap
+
+The flame button in the top bar turns on the usage heatmap. It colors each plugin and marketplace by how often you used it, on a log scale. In the detail panel, each skill and command that you used gets a badge with its use count and the time of last use. A legend in the top bar shows the highest counts.
+
+The **skills only** checkbox counts only skill and command uses and ignores plugin activations. Hooks fire on each event, so plugin activations can make counts look high.
+
+The counts come from `skillUsage` and `pluginUsage` in `.claude.json`. For the default config dir, that file is `~/.claude.json`. For a custom config dir, it is `<config dir>/.claude.json`. The app remembers both settings in your browser.
+
+## Refresh the data
+
+The app caches marketplace data on the server. Click **Refresh** or press <kbd>R</kbd> to clear the cache and load the data again. A "Data refreshed" message confirms it. The app also clears the cache after each plugin or marketplace action and after a project switch.
+
+<Lightbox />

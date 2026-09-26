@@ -1,0 +1,94 @@
+---
+title: Preview plugins and skills
+description: Read the components and files of a plugin before you install it.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+Select a plugin in the tree to open its detail panel. The **Components** section lists what the plugin adds to Claude Code. Click an item to read its files.
+
+<Shot themed="h1b-hub-marketplace-plugin" alt="Detail panel of a plugin that is not installed, with the Scope Installation matrix and the Components section that lists README.md, Skills, and MCP Servers" />
+
+## Component groups
+
+The Components section shows one group for each type the plugin has, with a count and a list of items:
+
+- Skills
+- Commands
+- Agents
+- MCP Servers
+- Hooks
+- LSP Servers
+- Monitors
+- Settings
+- CLAUDE.md
+- AGENTS.md
+- Agent Skills (not-supported)
+
+If the plugin has a README file, a link with its file name shows first, above the groups.
+
+Settings, CLAUDE.md, AGENTS.md, and Agent Skills come from the User Customizations and Project Customizations entries. Agent Skills lists the skills in `.agents/skills`. You can read them, but Claude Code does not load them.
+
+If a plugin has no components and no README, the section says "No components found".
+
+## Where components come from
+
+Claude Code Marketplace scans these paths in the plugin folder:
+
+| Component | Path |
+| --- | --- |
+| Skills | `skills/` |
+| Commands | `commands/` |
+| Agents | `agents/` |
+| MCP servers | `.mcp.json` |
+| Hooks | `hooks/hooks.json` |
+| LSP servers | `.lsp.json` |
+| Monitors | `monitors/monitors.json` |
+
+The plugin manifest (`.claude-plugin/plugin.json`) can also declare components. A declaration in the manifest adds to the files in these paths. It does not replace them.
+
+A marketplace entry can also list component names. When it does, only those names show. When no files are found, the list in the marketplace entry shows on its own.
+
+## Read files in the File Preview
+
+Click a component item or the README to open the File Preview. The title shows the plugin name and the component type. The file tree is on the left. The file content is on the right, with syntax highlighting.
+
+<Shot themed="h1c-hub-marketplace-skill" alt="File Preview for the skills of the example-skills plugin, with the skill folder tree on the left and SKILL.md open on the right, its YAML frontmatter highlighted" />
+
+- A skill opens its folder and selects `SKILL.md`. If the folder has no `SKILL.md`, the first file opens.
+- Click a folder in the tree to expand it. Click a file to show it.
+- Highlighting covers Markdown, JSON, YAML, JavaScript, TypeScript, Python, shell, CSS, HTML, XML, and TOML. In a Markdown file, the YAML frontmatter has its own highlighting.
+- A file longer than 100,000 characters shows its first 100,000 characters, then the line `--- truncated (100KB limit) ---`.
+- An empty file shows "(empty file)". An empty folder shows "(empty directory)" in the tree and "No files in this directory" in the viewer. A file that does not load shows "Failed to load file".
+- A component that is declared inline in `marketplace.json` or in the plugin manifest has no file of its own. The preview shows the declared block as a generated `<type>.json`, for example `mcpServers.json`.
+
+The File Preview header has two buttons:
+
+- **Copy path** copies the absolute path of the file on screen.
+- **Open in VS Code** opens the plugin folder, its `.claude-plugin/plugin.json`, and the file on screen in your editor. `plugin.json` opens only if it exists. For an inline component, the marketplace's `.claude-plugin/marketplace.json` opens in place of the generated file. The editor comes from `$EDITOR`. The default is `code`.
+
+Press <kbd>Esc</kbd> to close the File Preview.
+
+## Plugins that are not installed
+
+You can preview a plugin that you have not installed, but only when its files are on your disk. Claude Code Marketplace looks for the plugin files in this order:
+
+1. The relative source path of the plugin, in the local copy of the marketplace.
+2. `plugins/<name>` in the local copy of the marketplace.
+3. The marketplace root, when the marketplace has only one plugin.
+4. The latest version folder in `plugins/cache/<marketplace>/<plugin>` in your Claude config folder.
+
+The app looks in these places only when the marketplace has a local copy.
+
+If none of these exist, the detail panel still lists the components that the marketplace declares. The items are disabled, and you cannot open them. The README link does not show. To read the files, install the plugin. See [Install, enable, and remove plugins](/claude-code-marketplace/guides/install-and-manage-plugins/).
+
+## Open a plugin folder in your editor
+
+Select or focus a plugin and press <kbd>E</kbd>. Claude Code Marketplace opens the plugin source folder in the editor from `$EDITOR`, or in `code` if `$EDITOR` is not set. If no plugin is selected, a toast says "Select a plugin first". A toast says "Opening in editor…". If the editor command is not on your PATH, nothing opens. For all keys, see [Keyboard shortcuts](/claude-code-marketplace/reference/keyboard-shortcuts/).
+
+## Access limits
+
+The preview reads files only inside the plugin folder. The User Customizations and Project Customizations entries can also read `.agents/skills`, and the project entry can read the root `CLAUDE.md` and `AGENTS.md` of the project. A request for any other path gets a 403 response with the error "Access denied".
+
+<Lightbox />

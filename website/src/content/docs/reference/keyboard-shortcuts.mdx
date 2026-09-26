@@ -1,0 +1,100 @@
+---
+title: Keyboard shortcuts
+description: Every shortcut in Claude Code Marketplace by group, and the rules for when a key acts.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+Claude Code Marketplace has a help modal that lists every shortcut. The tables on this page match it.
+
+## Open the help
+
+Press <kbd>?</kbd> (<kbd>Shift+/</kbd> on most layouts), or click the Keyboard shortcuts button (the ? icon) near the right end of the top bar. Press <kbd>Esc</kbd> or <kbd>?</kbd> again to close it.
+
+<Shot themed="h1f-hub-marketplace-shortcuts" alt="The Keyboard Shortcuts modal with the Navigate, Find, Open, View, and Hub groups" />
+
+## Navigate
+
+These keys move through the tree of marketplaces and plugins on the left.
+
+| Keys | Action |
+| --- | --- |
+| <kbd>Down</kbd> or <kbd>J</kbd> | Next row |
+| <kbd>Up</kbd> or <kbd>K</kbd> | Previous row |
+| <kbd>Right</kbd> or <kbd>L</kbd> | Expand a collapsed marketplace |
+| <kbd>Left</kbd> or <kbd>H</kbd> | Collapse an expanded marketplace. On a plugin row, move to its marketplace. |
+| <kbd>Enter</kbd> or <kbd>Space</kbd> | On a marketplace row, expand or collapse it. On a plugin row, open its details. |
+
+If no row has focus, the first <kbd>Down</kbd> or <kbd>Up</kbd> focuses the selected plugin, or the first row when nothing is selected.
+
+## Find
+
+| Keys | Action |
+| --- | --- |
+| <kbd>/</kbd> | Focus the search box |
+| <kbd>Down</kbd> or <kbd>Ctrl+N</kbd> | While you type in search, open the next match |
+| <kbd>Up</kbd> or <kbd>Ctrl+P</kbd> | While you type in search, open the previous match |
+| <kbd>Enter</kbd> | While you type in search, clear the query and keep the match open and focused |
+| <kbd>S</kbd> | Focus the scope filter |
+| <kbd>Esc</kbd> | Close the detail panel. In a text field, leave the field. |
+
+The match keys wrap from the last match to the first. If the scope filter would hide the match you keep with <kbd>Enter</kbd>, the filter changes to All. For more about search, see [Browse and search plugins](/claude-code-marketplace/guides/browse-and-search/).
+
+## Open
+
+| Keys | Action |
+| --- | --- |
+| <kbd>E</kbd> | Open the selected or focused plugin folder in your editor |
+| <kbd>Shift+U</kbd> | Open your user CLAUDE.md |
+| <kbd>Shift+P</kbd> | Switch project |
+
+If no plugin is selected or focused, <kbd>E</kbd> shows the message "Select a plugin first". The editor comes from the `EDITOR` environment variable. The default is `code` (VS Code). See [Configuration and CLI](/claude-code-marketplace/reference/configuration/).
+
+<kbd>Shift+U</kbd> and <kbd>Shift+P</kbd> need <kbd>Shift</kbd> because browser extensions in the Vimium style use plain <kbd>U</kbd> and <kbd>P</kbd>.
+
+## View
+
+| Keys | Action |
+| --- | --- |
+| <kbd>R</kbd> | Refresh the data |
+| <kbd>T</kbd> | Toggle light and dark mode |
+| <kbd>?</kbd> | Show the help |
+
+## Hub
+
+The help shows this group only when Claude Code Marketplace runs inside Claude Code Hub. Standalone, these keys do nothing.
+
+| Keys | Action |
+| --- | --- |
+| <kbd>Ctrl+Alt+Left</kbd> or <kbd>Ctrl+Alt+Right</kbd> | Previous or next hub app |
+| <kbd>Alt+1</kbd> to <kbd>Alt+9</kbd> | Go to the hub app with that number |
+| <kbd>Ctrl+Alt+P</kbd> | Open the hub project picker |
+
+The app sends these keys to the hub, which does the action. See [Run inside Claude Code Hub](/claude-code-marketplace/reference/claude-code-hub/).
+
+## Project picker
+
+<kbd>Shift+P</kbd> or the folder button in the top bar opens the Switch Project picker. In its filter field:
+
+| Keys | Action |
+| --- | --- |
+| <kbd>Down</kbd> or <kbd>Ctrl+N</kbd> | Move down the list |
+| <kbd>Up</kbd> or <kbd>Ctrl+P</kbd> | Move up the list |
+| <kbd>Enter</kbd> | Switch to the highlighted project |
+| <kbd>Esc</kbd> | Close the picker |
+
+After you click **+ Add path...**, the path field has its own keys. <kbd>Enter</kbd> switches to the path you typed. <kbd>Esc</kbd> goes back to the list and keeps the picker open.
+
+## Add Marketplace field
+
+In the Marketplaces dialog, the Add Marketplace field takes <kbd>Enter</kbd> to add the source and <kbd>Esc</kbd> to close the dialog. See [Add and manage marketplaces](/claude-code-marketplace/guides/add-a-marketplace/).
+
+## When keys act
+
+- Single-key shortcuts (letters, arrow keys, and <kbd>Esc</kbd>) act only when you do not hold <kbd>Ctrl</kbd>, <kbd>Alt</kbd>, <kbd>Meta</kbd>, or <kbd>Shift</kbd>.
+- When a text field, text area, or dropdown has focus, the page shortcuts do not act. <kbd>Esc</kbd> moves focus out of the field. The search box and the fields listed above have their own keys.
+- When a button or link outside the tree has focus, <kbd>Enter</kbd> and <kbd>Space</kbd> press that control.
+- When a modal is open, only <kbd>Esc</kbd> acts, and it closes the modal. In the help modal, <kbd>?</kbd> closes it too.
+
+<Lightbox />

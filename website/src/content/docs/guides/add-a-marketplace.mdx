@@ -1,0 +1,97 @@
+---
+title: Add and manage marketplaces
+description: Add a marketplace from GitHub, a git URL, or a local folder, then update or remove it.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+A marketplace is a catalog of plugins. Claude Code Marketplace lists each marketplace in your Claude Code registry, and you can add, update, and remove them from the app. Every change runs the `claude plugin marketplace` CLI, so Claude Code must be on your PATH.
+
+<Shot themed="h1e-hub-marketplace-add" alt="The Marketplaces dialog with the Add Marketplace field and the Registered list" />
+
+## Open the Marketplaces dialog
+
+Click **Add** in the top bar. Its tooltip is "Manage marketplaces". The **Marketplaces** dialog opens with two parts:
+
+- **Add Marketplace**: a source field and an **Add** button.
+- **Registered**: the marketplaces you have now.
+
+## Add a marketplace
+
+1. Type a source in the **Add Marketplace** field.
+2. Press <kbd>Enter</kbd> or click **Add**.
+
+The app runs `claude plugin marketplace add <source>`. Press <kbd>Esc</kbd> to close the dialog.
+
+### Accepted sources
+
+| Source | Example |
+| --- | --- |
+| GitHub `owner/repo` | `anthropics/skills` |
+| http or https URL | `https://github.com/org/repo.git` |
+| SSH git URL | `git@github.com:org/repo.git` |
+| Local folder that exists | `~/dev/my-marketplace` or `/path/to/directory` |
+
+A leading `~` in a folder path expands to your home folder.
+
+:::caution[Type plain owner/repo]
+The field placeholder shows `github:owner/repo`. The app rejects that form. Type `anthropics/skills`, with no `github:` prefix.
+:::
+
+The app also rejects a source that starts with `-` or holds shell characters such as `;`, `|`, `&`, `$`, or quotes. Any other value that does not match a form in the table gives this error:
+
+```text
+Invalid source: expected owner/repo, a git URL, or an existing directory
+```
+
+### Read the result
+
+After the CLI finishes, the app compares the registry before and after the add. A message under the field tells you what changed.
+
+| Message | Meaning |
+| --- | --- |
+| The CLI output, or `Added "<name>"` when the CLI prints nothing | The registry has a new marketplace. The field clears and the list reloads. |
+| `"<name>" already existed and now points at <to> (was <from>)` | The source declares a name that was already registered. The CLI takes the name from the source's `marketplace.json`, so it moved the existing entry to the new source. It did not add a second one. |
+| The CLI message, then `Registry unchanged: <configDir>` | Nothing changed. For example, the source was already registered. `<configDir>` is the Claude config folder the app reads. |
+
+If the CLI fails, the error text shows in red.
+
+A marketplace source needs a `.claude-plugin/marketplace.json` file. If the file is missing, the CLI adds nothing and the app shows `Registry unchanged`. If a registered marketplace loses the file later, it shows in the tree with no plugins.
+
+## See registered marketplaces
+
+The **Registered** list shows each marketplace from the registry. The User Customizations and Project Customizations entries do not show here. Each row has:
+
+- The name and version.
+- The source: the repo, path, or URL.
+- A badge: **GitHub**, **Local**, or **Git**.
+- A count of installed plugins over total plugins, for example `2/9`.
+- A trash button to remove the marketplace.
+
+Click a row to close the dialog and open that marketplace's info panel.
+
+## Remove a marketplace from the dialog
+
+1. Click the trash button on the row.
+2. Confirm the prompt `Remove marketplace "<name>"?`.
+
+The app runs `claude plugin marketplace remove <name>`.
+
+## Update or remove from the info panel
+
+Click the **Marketplace info** button (three dots) on a marketplace row in the tree to open its info panel. For the fields it shows, see [Marketplace details](/claude-code-marketplace/guides/browse-and-search/#marketplace-details). Under **Actions**:
+
+- **Update** runs `claude plugin marketplace update <name>` to fetch the latest catalog.
+- **Remove** runs `claude plugin marketplace remove <name>`. This button does not ask you to confirm.
+
+A message shows while the command runs, then the CLI output or the error. The data reloads after a success.
+
+## Related pages
+
+- [Browse and search plugins](/claude-code-marketplace/guides/browse-and-search/)
+- [Install, enable, and remove plugins](/claude-code-marketplace/guides/install-and-manage-plugins/)
+- [Configuration and CLI](/claude-code-marketplace/reference/configuration/)
+- [Troubleshooting](/claude-code-marketplace/reference/troubleshooting/)
+
+<Lightbox />
