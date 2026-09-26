@@ -11,6 +11,10 @@ export default defineConfig({
 			title: 'Claude Code Marketplace',
 			description: 'Browse, install, and manage Claude Code plugins from every marketplace you use.',
 			favicon: '/favicon.svg',
+			head: [
+				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://nikiforovall.blog/claude-code-marketplace/og.png' } },
+				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://nikiforovall.blog/claude-code-marketplace/og.png' } },
+			],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/NikiforovAll/claude-code-marketplace' }],
 			editLink: { baseUrl: 'https://github.com/NikiforovAll/claude-code-marketplace/edit/main/website/' },
 			customCss: ['./src/kit/kit.css'],
