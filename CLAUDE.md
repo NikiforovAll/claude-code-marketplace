@@ -39,4 +39,4 @@ Resolution follows the [plugin manifest schema](https://www.schemastore.org/clau
 
 ## Linting
 
-Biome 2.4.7 — enforced via Husky pre-commit hook on `public/app.js` and `public/style.css`. Config: 2-space indent, 120 char width, single quotes.
+Biome 2.4.7 — enforced via Husky pre-commit hook on the files in `biome.json` (`public/app.js`, `public/style.css`, `server.js`, `lib/`). Config: 2-space indent, 120 char width, single quotes. The server files are lint-only: the formatter is off for them. `package.json` sets `"type": "commonjs"` so Biome parses `.js` as script and does not flag `'use strict'`.

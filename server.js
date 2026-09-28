@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 const { openInEditor, execNoShell } = require('./lib/open-editor');
 const { createNetGuard } = require('./lib/net-guard');
 const { isContainedAny } = require('./lib/contain');
@@ -118,7 +118,7 @@ function promoteProjectRecord(pluginId, scope) {
 function loadRegistry() {
   const v2Data = readJsonSafe(INSTALLED_PLUGINS_FILE);
   const installed = {};
-  if (v2Data && v2Data.plugins) {
+  if (v2Data?.plugins) {
     for (const [pluginId, installations] of Object.entries(v2Data.plugins)) {
       installed[pluginId] = installations.map(inst => ({
         scope: inst.scope || 'user',
@@ -493,7 +493,7 @@ function scanCustomizations(basePath, scope) {
 
 function parseVer(v) {
   const parts = String(v).split('.').map(Number);
-  return parts.some(isNaN) ? null : parts;
+  return parts.some(Number.isNaN) ? null : parts;
 }
 
 function semverCompare(a, b) {
@@ -654,7 +654,7 @@ app.get('/api/plugins/:pluginId/preview/*', (req, res) => {
   if (!isPathAllowed(fullPath, pluginDir, pluginId)) {
     return res.status(403).json({ error: 'Access denied' });
   }
-  if (!fs.existsSync(fullPath) && fs.existsSync(fullPath + '.md')) fullPath += '.md';
+  if (!fs.existsSync(fullPath) && fs.existsSync(`${fullPath}.md`)) fullPath += '.md';
 
   try {
     const stat = fs.statSync(fullPath);
@@ -695,7 +695,7 @@ app.post('/api/open-in-editor', (req, res) => {
   const pluginJson = path.join(pluginDir, '.claude-plugin', 'plugin.json');
   if (fs.existsSync(pluginJson)) args.push(pluginJson);
 
-  if (relativePath && relativePath.startsWith(INLINE_PREFIX)) {
+  if (relativePath?.startsWith(INLINE_PREFIX)) {
     const installLocation = findPlugin(pluginId, marketplaces)?._installLocation;
     if (installLocation) {
       const mktJson = path.join(installLocation, '.claude-plugin', 'marketplace.json');
@@ -708,7 +708,7 @@ app.post('/api/open-in-editor', (req, res) => {
     if (!isPathAllowed(fullPath, pluginDir, pluginId)) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    if (!fs.existsSync(fullPath) && fs.existsSync(fullPath + '.md')) fullPath += '.md';
+    if (!fs.existsSync(fullPath) && fs.existsSync(`${fullPath}.md`)) fullPath += '.md';
     args.push(fullPath);
   }
 

@@ -3,6 +3,7 @@
   "version": "0.20.0",
   "description": "Web UI for browsing and managing Claude Code marketplace plugins",
   "main": "server.js",
+  "type": "commonjs",
   "bin": {
     "claude-code-marketplace": "server.js"
   },
@@ -39,8 +40,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --open",
-    "lint": "npx @biomejs/biome check public/app.js public/style.css",
-    "lint:fix": "npx @biomejs/biome check --fix public/app.js public/style.css",
+    "lint": "npx @biomejs/biome check",
+    "lint:fix": "npx @biomejs/biome check --fix",
     "prepare": "husky",
     "test": "node --test test/*.test.js"
   },
