@@ -2320,10 +2320,7 @@ let hubProjectPath = null;
 // Shared with initProjectScope so a boot restore and a hub push never apply the same project twice.
 let lastAppliedProject = null;
 
-hub.subscribe('project.changed', async (p) => {
-  const dirPath = p?.project;
-  if (typeof dirPath !== 'string' || !dirPath) return;
-  hubProjectPath = dirPath;
+async function applyProject(dirPath) {
   // Dedupes against the last applied value, not just an in-flight one: the hub re-posts on
   // every iframe load, so without this each load would PUT and reload twice.
   if (lastAppliedProject === dirPath) return;
@@ -2333,7 +2330,30 @@ hub.subscribe('project.changed', async (p) => {
     await loadData();
   } catch (err) {
     lastAppliedProject = null;
-    console.warn('hub:project failed:', err.message);
+    throw err;
   }
+}
+
+// A ?project= link outranks the hub's project, which the hub posts again on every iframe load,
+// until the hub moves to another one.
+let linkPinned = !!new URLSearchParams(location.search).get('project');
+let pinnedHubValue;
+
+hub.subscribe('project.changed', (p) => {
+  const dirPath = typeof p?.project === 'string' && p.project ? p.project : null;
+  if (linkPinned) {
+    if (pinnedHubValue === undefined) pinnedHubValue = dirPath;
+    if (pinnedHubValue === dirPath) return;
+    linkPinned = false;
+  }
+  if (!dirPath) return;
+  hubProjectPath = dirPath;
+  applyProject(dirPath).catch((err) => console.warn('hub:project failed:', err.message));
+});
+
+// A link moves this app off the hub's project, and applyProject records that, so the next
+// project.changed still applies.
+hub.handle('project.plugins', (p) => {
+  if (p.project) applyProject(p.project).catch((err) => toast(err.message, 'error'));
 });
 // #endregion HUB_INTEGRATION
