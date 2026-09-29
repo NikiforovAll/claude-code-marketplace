@@ -1513,8 +1513,8 @@ function restoreAppState() {
 async function initProjectScope() {
   const fromUrl = new URLSearchParams(window.location.search).get('project');
   let { path: current, explicit } = await projectInfoPromise;
-  // A hub-pushed project outranks the stored recent: the hub posts on iframe load, so hub:project
-  // can land before or during this block.
+  // A hub-pushed project outranks the stored recent: the hub posts right after hello, so
+  // project.changed can land before or during this block.
   const desired = fromUrl || hubProjectPath || (explicit ? null : getRecentProjects()[0]);
   if (desired && desired !== current) {
     try {
@@ -2334,21 +2334,11 @@ async function applyProject(dirPath) {
   }
 }
 
-// A ?project= link outranks the hub's project, which the hub posts again on every iframe load,
-// until the hub moves to another one.
-let linkPinned = !!new URLSearchParams(location.search).get('project');
-let pinnedHubValue;
-
 hub.subscribe('project.changed', (p) => {
   const dirPath = typeof p?.project === 'string' && p.project ? p.project : null;
-  if (linkPinned) {
-    if (pinnedHubValue === undefined) pinnedHubValue = dirPath;
-    if (pinnedHubValue === dirPath) return;
-    linkPinned = false;
-  }
   if (!dirPath) return;
   hubProjectPath = dirPath;
-  applyProject(dirPath).catch((err) => console.warn('hub:project failed:', err.message));
+  applyProject(dirPath).catch((err) => console.warn('project.changed failed:', err.message));
 });
 
 // A link moves this app off the hub's project, and applyProject records that, so the next
