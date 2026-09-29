@@ -30,6 +30,10 @@ app.get('/hub-config', (_req, res) => {
   res.json({ enabled: !!process.env.CLAUDE_HUB, url: process.env.HUB_URL || null });
 });
 
+// A hub run from its repo passes its SDK source, so an SDK edit needs no sync.
+const sdkFile = process.env.HUB_SDK_SRC || path.join(__dirname, 'public/vendor/claude-hub-sdk.js');
+app.get('/vendor/claude-hub-sdk.js', (_req, res) => res.sendFile(sdkFile));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const DEFAULT_CLAUDE_DIR = path.join(os.homedir(), '.claude');
