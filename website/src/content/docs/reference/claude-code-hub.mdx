@@ -22,7 +22,7 @@ The hub starts Claude Code Marketplace as a child process and sets three environ
 
 The app reads the config dir once at startup. When you switch the config dir in the hub, the hub uses a different Claude Code Marketplace process for that dir.
 
-The page asks the server for its hub settings at `GET /hub-config`. The answer is `{"enabled": true, "url": "<HUB_URL>"}` in hub mode. Standalone, `enabled` is `false` and `url` is `null`, and none of the changes on this page apply.
+The hub also gives the app its SDK. In hub mode, the page asks the server for its hub settings at `GET /hub-config`, and the answer is `{"enabled": true, "url": "<HUB_URL>"}`. Standalone, the app has no `/hub-config` route and uses a stub of the SDK that talks to no hub, so none of the changes on this page apply. See [Hub protocol v1](https://nikiforovall.blog/claude-code-hub/reference/protocol/).
 
 ## Keys the app sends to the hub
 
