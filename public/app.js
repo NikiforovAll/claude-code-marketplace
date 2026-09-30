@@ -277,14 +277,20 @@ function setColorTheme(id) {
   syncColorThemeMenu(id);
 }
 
+function renderThemeMenu(themes = COLOR_THEMES) {
+  document.getElementById('themeMenu').innerHTML = themes
+    .map(
+      ([id, label]) =>
+        `<button type="button" class="theme-menu-item theme-swatch-${id}" data-theme-id="${id}">
+         <span class="theme-swatch theme-swatch-${id}"><i class="sw-bg"></i><i class="sw-accent"></i><i class="sw-ink"></i></span>${esc(label)}
+       </button>`,
+    )
+    .join('');
+}
+
 function buildThemeMenu() {
   const menu = document.getElementById('themeMenu');
-  menu.innerHTML = COLOR_THEMES.map(
-    ([id, label]) =>
-      `<button type="button" class="theme-menu-item theme-swatch-${id}" data-theme-id="${id}">
-         <span class="theme-swatch theme-swatch-${id}"><i class="sw-bg"></i><i class="sw-accent"></i><i class="sw-ink"></i></span>${label}
-       </button>`,
-  ).join('');
+  renderThemeMenu();
   // stopPropagation keeps the click from bubbling to the picker button, which would re-toggle the menu
   menu.addEventListener('click', (e) => {
     const item = e.target.closest('.theme-menu-item');
@@ -2318,6 +2324,12 @@ document.getElementById('helpDocs')?.addEventListener('click', (e) => {
     attributeFilter: ['class', 'data-color-theme'],
   });
 })();
+
+// Under the hub the picker lists the hub's themes, which include the user's own (protocol section 6, rule 5).
+hub.onThemes((themes) => {
+  renderThemeMenu(themes.map((t) => [t.id, t.label]));
+  syncColorThemeMenu(document.body.dataset.colorTheme);
+});
 
 // Set synchronously when the hub pushes a project, so the boot restore in initProjectScope can't
 // let a stale localStorage recent win the race against the hub's choice.
