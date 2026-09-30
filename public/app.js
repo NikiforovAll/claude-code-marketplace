@@ -2298,6 +2298,11 @@ function initSidebarResize() {
 // #region HUB_INTEGRATION
 const hub = ClaudeHub.connect();
 
+document.getElementById('helpDocs')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  hub.openExternal(e.currentTarget.href);
+});
+
 (function initHubTheme() {
   const getTheme = () => (document.body.classList.contains('light') ? 'light' : 'dark');
   const getColorTheme = () => document.body.dataset.colorTheme || 'ember';
