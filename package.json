@@ -1,6 +1,6 @@
 {
   "name": "claude-code-marketplace",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Web UI for browsing and managing Claude Code marketplace plugins",
   "main": "server.js",
   "type": "commonjs",
