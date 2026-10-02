@@ -75,6 +75,13 @@ body.light {
   padding: 0;
 }
 
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 body {
   font-family: var(--mono);
   font-size: 13px;
