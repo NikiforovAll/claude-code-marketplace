@@ -1104,6 +1104,12 @@ body.light .scope-toggle.local {
   box-shadow: inset 2px 0 0 var(--accent);
   opacity: 1;
 }
+.mod-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
 .readme-comp-item {
   display: flex;
   align-items: center;

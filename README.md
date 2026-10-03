@@ -40,7 +40,7 @@ See [Getting started](https://nikiforovall.blog/claude-code-marketplace/getting-
 - **Search.** Matches plugin names, descriptions, categories, and tags. A query of three or more characters also matches skill, command, and agent names in every scope. <kbd>↓</kbd>/<kbd>↑</kbd> step through the matches while you type.
 - **Scope management.** Install, enable, disable, remove, and update each plugin in user, project, or local scope. The **U**, **P**, and **L** badges in the tree show and toggle the state of each scope.
 - **Update alerts.** The tree and the detail panel show when a plugin has a newer catalog version.
-- **Component and file preview.** Read the skills, commands, agents, MCP servers, hooks, LSP servers, and monitors of a plugin, with syntax highlighting, before you install it.
+- **Component and file preview.** Read the skills, commands, agents, MCP servers, hooks, mods, LSP servers, and monitors of a plugin, with syntax highlighting, before you install it.
 - **Marketplace management.** Add, update, and remove marketplace sources from the app.
 - **Your own customizations.** The skills, commands, agents, hooks, settings, and `CLAUDE.md` files in your config dir and in the project's `.claude` folder show as two read-only entries.
 - **Usage heatmap.** Colors plugins and skills by how often you used them, from `skillUsage` and `pluginUsage` in `.claude.json`.

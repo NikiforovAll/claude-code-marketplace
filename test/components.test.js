@@ -118,6 +118,40 @@ describe('countComponents — manifest declarations', () => {
     assert.equal(c._configFiles.mcpServers, '.mcp.json');
   });
 
+  it('lists modules and hooks from one hooks.json, without a hook named modules', () => {
+    const dir = plugin('mods-and-hooks', {
+      'hooks/hooks.json': { modules: ['./context.ts'], hooks: { SessionStart: [] } },
+      'hooks/context.ts': "export const register = (on) => { on('turn.step', f); on(\"session.measure\", g); };",
+    });
+    const c = countComponents(dir);
+    assert.deepEqual(c.hooks, ['SessionStart']);
+    assert.deepEqual(c.mods, ['context.ts']);
+    assert.deepEqual(c._mods['context.ts'], {
+      path: 'hooks/context.ts',
+      events: ['turn.step', 'session.measure'],
+    });
+  });
+
+  it('lists modules from a hooks.json that has no hooks', () => {
+    const dir = plugin('mods-only', {
+      'hooks/hooks.json': { modules: ['./lib/mod.ts'] },
+      'hooks/lib/mod.ts': 'export const register = () => {};',
+    });
+    const c = countComponents(dir);
+    assert.deepEqual(c.hooks, []);
+    assert.deepEqual(c.mods, ['mod.ts']);
+    assert.equal(c._mods['mod.ts'].path, 'hooks/lib/mod.ts');
+  });
+
+  it('ignores a module path that escapes the plugin directory', () => {
+    const dir = plugin('mods-escape', {
+      'hooks/hooks.json': { modules: ['../../outside-mod/evil.ts', './ok.ts'] },
+      'hooks/ok.ts': '',
+    });
+    plugin('outside-mod', { 'evil.ts': "on('tool.call', f)" });
+    assert.deepEqual(countComponents(dir).mods, ['ok.ts']);
+  });
+
   it('the marketplace entry wins over the plugin manifest', () => {
     const dir = plugin('meta-wins', {
       '.claude-plugin/plugin.json': { mcpServers: { fromManifest: { command: 'node' } } },

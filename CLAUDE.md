@@ -29,7 +29,7 @@ No build step. No framework. Static files served directly by Express.
 
 **Plugin Scopes**: user (`~/.claude/plugins/`), project (`./<project>/.claude/`), local (`.claude/settings.local.json`). Each scope has independent install/enable state.
 
-**Components**: scanned by `countComponents` in `lib/components.js`, driven by two tables — `DIR_COMPONENTS` (skills `skills/`, commands `commands/`, agents `agents/`) and `JSON_COMPONENTS` (MCP servers `.mcp.json`, hooks `hooks/hooks.json`, LSP servers `.lsp.json`, monitors `monitors/monitors.json`).
+**Components**: scanned by `countComponents` in `lib/components.js`, driven by two tables — `DIR_COMPONENTS` (skills `skills/`, commands `commands/`, agents `agents/`) and `JSON_COMPONENTS` (MCP servers `.mcp.json`, hooks `hooks/hooks.json`, LSP servers `.lsp.json`, monitors `monitors/monitors.json`). Mods are the files a hooks file names in its `modules` array, resolved against that file's folder and containment-checked; `modules` is never a hook event. Mods are derived, not declared, so they stay out of `COMPONENT_KEYS`.
 
 Resolution follows the [plugin manifest schema](https://www.schemastore.org/claude-code-plugin-manifest.json): a key is declared by the marketplace entry, else the plugin manifest's top level, else its `experimental` block (the older spelling for `monitors`). A declaration takes an inline value, a `./x.json` path, or an array mixing both, and is **additive** to the conventional file or directory rather than replacing it. Declared paths are containment-checked; the table's own defaults are literals and are not. A component declared inline gets `INLINE_PREFIX` in `_configFiles` so the preview route renders the declared block instead of opening a file.
 

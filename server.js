@@ -216,6 +216,10 @@ function buildComponents(fsComps, pd = {}) {
   }
   if (fsComps?._configFiles) components._configFiles = fsComps._configFiles;
   if (fsComps?._readmePath) components._readmePath = fsComps._readmePath;
+  if (fsComps?.mods.length) {
+    components.mods = fsComps.mods;
+    components._mods = fsComps._mods;
+  }
   // A component the plugin's own manifest declares inline previews the same way one the
   // marketplace entry declares inline does.
   Object.assign(inlineConfig, fsComps?._inlineConfig);

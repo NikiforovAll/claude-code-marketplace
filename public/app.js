@@ -55,6 +55,9 @@ const ICONS = {
     '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>',
   ),
   monitors: SVG('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'),
+  mods: SVG(
+    '<path d="M12 2l9 5v10l-9 5-9-5V7z"/><polyline points="8 10 6 12 8 14"/><polyline points="16 10 18 12 16 14"/><line x1="13" y1="9" x2="11" y2="15"/>',
+  ),
   folder: SVG('<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'),
   file: SVG('<path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/>'),
   gear: SVG(
@@ -90,6 +93,7 @@ const COMP_LABELS = {
   hooks: 'Hooks',
   lspServers: 'LSP Servers',
   monitors: 'Monitors',
+  mods: 'Mods',
   settings: 'Settings',
   claudeMd: 'CLAUDE.md',
   agentsMd: 'AGENTS.md',
@@ -1010,6 +1014,11 @@ function renderPluginMetadata(plugin) {
   return `<div class="plugin-meta-bar">${chips.join('')}${links.join('')}</div>`;
 }
 
+function modEventTags(mod) {
+  if (!mod?.events?.length) return '';
+  return `<span class="mod-events">${mod.events.map((e) => `<span class="meta-tag">${esc(e)}</span>`).join('')}</span>`;
+}
+
 function renderDetailComponents(pluginId, comps, hasDirAccess) {
   const configFiles = comps._configFiles || {};
   const compHits = isGlobalSearch();
@@ -1045,7 +1054,8 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
           const dir = COMP_DIR_MAP[type] || null;
           html += '<div class="detail-comp-items">';
           for (const name of names) {
-            const clickPath = configFile || (dir ? `${dir}/${name}` : name);
+            const mod = type === 'mods' ? comps._mods?.[name] : null;
+            const clickPath = mod?.path || configFile || (dir ? `${dir}/${name}` : name);
             const cls = hasDirAccess ? '' : ' disabled';
             const click = hasDirAccess
               ? ` onclick="openContentModal('${escAttrJs(pluginId)}', '${escAttrJs(clickPath)}', '${escAttrJs(type)}')"`
@@ -1056,6 +1066,7 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
             html += `<div class="detail-comp-item${cls}${hit}"${click}>
             <span class="icon">${isFolder ? ICONS.folder : ICONS.file}</span>
             <span class="hl-fit">${hl(label)}</span>
+            ${modEventTags(mod)}
             ${heatBadgeFor(pluginId, type, name)}
           </div>`;
           }
