@@ -59,7 +59,8 @@ Install, remove, enable, disable, and update run the `claude plugin` CLI. The se
 
 | File | What it gives |
 | --- | --- |
-| `<config dir>/plugins/known_marketplaces.json` | The registered marketplaces. If this file is missing, no marketplaces show. |
+| `<config dir>/plugins/known_marketplaces.json` | The registered marketplaces. If this file is missing, only org marketplaces show. |
+| `<config dir>/plugins/synced/*/` | Org marketplaces that Claude Code syncs from claude.ai: `manifest.json` lists the plugins and their marketplace, and each plugin has its own folder. They show with the **Org** badge. |
 | `<config dir>/plugins/installed_plugins.json` | Install records per scope. Project and local records count only for the current project. |
 | `<install location>/.claude-plugin/marketplace.json` | The plugin catalog of each marketplace. If it is missing, the marketplace has no plugins, and the `/api/marketplaces` response carries `marketplace.json not found at <path>`. |
 | `<config dir>/settings.json` | `enabledPlugins` for user scope. |
@@ -68,6 +69,8 @@ Install, remove, enable, disable, and update run the `claude plugin` CLI. The se
 | `~/.claude.json` (default dir) or `<config dir>/.claude.json` (custom dir) | `skillUsage` and `pluginUsage` for the usage heatmap. |
 
 An installed plugin counts as enabled unless `enabledPlugins` sets it to `false`.
+
+Your organization manages org plugins, so you cannot install, remove or update them here. You can enable or disable each one at user scope. The CLI names them `<name>@synced` and writes the state to user `enabledPlugins`. If a plugin from another marketplace has the same name, Claude Code loads that plugin, and the org plugin's detail panel says so.
 
 The server keeps marketplace data in memory. It clears that cache after each plugin or marketplace action, after a project change, and when you select **Refresh** or press <kbd>R</kbd>. If you edit these files by hand, refresh to see the change.
 

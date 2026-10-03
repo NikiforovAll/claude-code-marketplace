@@ -642,6 +642,10 @@ body.light .scope-toggle.local {
   background: var(--team-dim);
   color: var(--team);
 }
+.badge-org {
+  background: var(--success-dim);
+  color: var(--success);
+}
 .badge-virtual {
   background: var(--plan-dim);
   color: var(--plan);

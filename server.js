@@ -193,14 +193,110 @@ function buildScopeData(registry) {
   return { installedScopes, scopeInstallPaths, scopeVersions, userInstalledIds, projectInstalledIds, enabledIds };
 }
 
+// `pd` is the plugin's marketplace entry; it narrows or adds to what the plugin dir holds.
+function buildComponents(fsComps, pd = {}) {
+  const components = {};
+  const inlineConfig = {};
+  for (const k of COMPONENT_KEYS) {
+    if (fsComps && Array.isArray(fsComps[k]) && fsComps[k].length > 0) {
+      if (Array.isArray(pd[k]) && pd[k].length > 0) {
+        const allowed = new Set(pd[k].map(p => path.basename(typeof p === 'string' ? p : (p.name || String(p)))));
+        components[k] = fsComps[k].filter(name => allowed.has(name));
+      } else {
+        components[k] = fsComps[k];
+      }
+    } else if (Array.isArray(pd[k]) && pd[k].length > 0) {
+      components[k] = pd[k].map(p => typeof p === 'string' ? path.basename(p) : (p.name || String(p)));
+    } else if (pd[k] && typeof pd[k] === 'object') {
+      components[k] = Object.keys(pd[k]);
+      inlineConfig[k] = pd[k];
+    } else if (pd[k]) {
+      components[k] = [String(pd[k])];
+    }
+  }
+  if (fsComps?._configFiles) components._configFiles = fsComps._configFiles;
+  if (fsComps?._readmePath) components._readmePath = fsComps._readmePath;
+  // A component the plugin's own manifest declares inline previews the same way one the
+  // marketplace entry declares inline does.
+  Object.assign(inlineConfig, fsComps?._inlineConfig);
+  for (const k of Object.keys(inlineConfig)) {
+    if (!components._configFiles) components._configFiles = {};
+    if (!components._configFiles[k]) components._configFiles[k] = `${INLINE_PREFIX}${k}`;
+  }
+  return { components, inlineConfig };
+}
+
+// Org marketplaces from claude.ai are not in known_marketplaces.json. Claude Code syncs
+// them to plugins/synced/<org>_<user>/: manifest.json lists the plugins with their
+// marketplace, and each plugin has its own folder. The CLI names such a plugin
+// `<name>@synced`, can only enable or disable it, and keeps that state in user
+// enabledPlugins. The layout is undocumented; verified against Claude Code 2.1.x.
+const SYNCED_DIR = path.join(PLUGINS_DIR, 'synced');
+const SYNCED_MARKETPLACE = 'synced';
+
+function listSyncedBuckets() {
+  try {
+    return fs.readdirSync(SYNCED_DIR, { withFileTypes: true })
+      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+      .map(e => path.join(SYNCED_DIR, e.name));
+  } catch {
+    return [];
+  }
+}
+
+function loadOrgMarketplaces(registry) {
+  const byName = new Map();
+  const seen = new Set();
+  for (const bucket of listSyncedBuckets()) {
+    const manifest = readJsonSafe(path.join(bucket, 'manifest.json'));
+    if (!Array.isArray(manifest?.plugins)) continue;
+    for (const entry of manifest.plugins) {
+      const name = entry?.name;
+      if (!isName(name)) continue;
+      const fullId = `${name}@${SYNCED_MARKETPLACE}`;
+      if (seen.has(fullId)) continue;
+      seen.add(fullId);
+      const mName = entry.marketplaceName || 'Organization';
+      if (!byName.has(mName)) byName.set(mName, { name: mName, source: { type: 'org' }, isManaged: true, plugins: [] });
+
+      const dir = path.join(bucket, name);
+      const pluginDir = fs.existsSync(dir) ? dir : null;
+      const pjData = pluginDir ? readJsonSafe(path.join(pluginDir, '.claude-plugin', 'plugin.json')) : null;
+      const version = pjData?.version || entry.version || null;
+      const enabled = registry.userEnabled[fullId] !== false;
+      const { components, inlineConfig } = buildComponents(pluginDir ? countComponents(pluginDir) : null);
+      const shadowedBy = Object.keys(registry.installed)
+        .find(id => id !== fullId && id.slice(0, id.lastIndexOf('@')) === name) || null;
+
+      byName.get(mName).plugins.push({
+        name,
+        fullId,
+        description: entry.description || pjData?.description || '',
+        version,
+        isInstalled: true,
+        isEnabled: enabled,
+        isManaged: true,
+        shadowedBy,
+        scopeDetails: { user: { installed: true, enabled, version } },
+        components,
+        _pluginDir: toUnixPath(pluginDir),
+        _inlineConfig: Object.keys(inlineConfig).length ? inlineConfig : null,
+        metadata: pjData?.author ? { author: pjData.author } : {},
+      });
+    }
+  }
+  return [...byName.values()];
+}
+
 function loadMarketplaces() {
   const known = readJsonSafe(KNOWN_MARKETPLACES_FILE);
-  if (!known) return [];
-
   const registry = loadRegistry();
+  const orgMarketplaces = loadOrgMarketplaces(registry);
+  if (!known) return orgMarketplaces;
+
   const scope = buildScopeData(registry);
 
-  const marketplaces = [];
+  const marketplaces = [...orgMarketplaces];
   for (const [name, entryData] of Object.entries(known)) {
     const sourceData = entryData.source || {};
     const installLocation = entryData.installLocation;
@@ -303,34 +399,7 @@ function loadMarketplaces() {
       if (!pluginDir) pluginDir = originDir;
 
       const fsComps = pluginDir ? countComponents(pluginDir) : null;
-      const components = {};
-      const inlineConfig = {};
-      for (const k of compKeys) {
-        if (fsComps && Array.isArray(fsComps[k]) && fsComps[k].length > 0) {
-          if (Array.isArray(pd[k]) && pd[k].length > 0) {
-            const allowed = new Set(pd[k].map(p => path.basename(typeof p === 'string' ? p : (p.name || String(p)))));
-            components[k] = fsComps[k].filter(name => allowed.has(name));
-          } else {
-            components[k] = fsComps[k];
-          }
-        } else if (Array.isArray(pd[k]) && pd[k].length > 0) {
-          components[k] = pd[k].map(p => typeof p === 'string' ? path.basename(p) : (p.name || String(p)));
-        } else if (pd[k] && typeof pd[k] === 'object') {
-          components[k] = Object.keys(pd[k]);
-          inlineConfig[k] = pd[k];
-        } else if (pd[k]) {
-          components[k] = [String(pd[k])];
-        }
-      }
-      if (fsComps?._configFiles) components._configFiles = fsComps._configFiles;
-      if (fsComps?._readmePath) components._readmePath = fsComps._readmePath;
-      // A component the plugin's own manifest declares inline previews the same way one the
-      // marketplace entry declares inline does.
-      Object.assign(inlineConfig, fsComps?._inlineConfig);
-      for (const k of Object.keys(inlineConfig)) {
-        if (!components._configFiles) components._configFiles = {};
-        if (!components._configFiles[k]) components._configFiles[k] = `${INLINE_PREFIX}${k}`;
-      }
+      const { components, inlineConfig } = buildComponents(fsComps, pd);
 
       const installedVersion = [scopeDetails.user, scopeDetails.project, scopeDetails.local]
         .find(d => d?.version && d.version !== 'unknown')?.version || null;
@@ -803,7 +872,7 @@ async function runClaudePlugin(args) {
   }
 }
 
-const { assertPluginId, assertName, assertScope, assertSource, badRequest, isExistingDir } = require('./lib/validate');
+const { assertPluginId, assertName, assertScope, assertSource, badRequest, isExistingDir, isName } = require('./lib/validate');
 
 function sendError(res, err) {
   res.status(err.status || 500).json({ error: err.message });

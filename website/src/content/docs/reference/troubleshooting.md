@@ -7,7 +7,7 @@ Find the message or symptom you see, then apply the fix.
 
 ## The tree says "No marketplaces found"
 
-Claude Code Marketplace reads the marketplace registry from `<config dir>/plugins/known_marketplaces.json`. If that file does not exist or is not valid JSON, the tree is empty. If the file has no entries, the tree still shows your user and project customizations, when you have them.
+Claude Code Marketplace reads the marketplace registry from `<config dir>/plugins/known_marketplaces.json`. If that file does not exist or is not valid JSON, the tree shows only org marketplaces, if you have them. If the file has no entries, the tree still shows your user and project customizations, when you have them.
 
 - Check that you use the correct config dir. The server takes it from `--dir`, then `CLAUDE_CONFIG_DIR`, then `CLAUDE_DIR`, then `~/.claude`. If Claude Code uses a different dir, start the server with `--dir <path>`.
 - If the file is missing, add a marketplace. See [Add and manage marketplaces](/claude-code-marketplace/guides/add-a-marketplace/).

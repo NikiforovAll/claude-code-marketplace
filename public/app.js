@@ -589,9 +589,10 @@ function renderTree() {
 
     const mExpanded = expandedNodes.has(`m_${mid}`) || !!searchFilter;
     const mIcon = m.isVirtual ? ICONS.gear : ICONS.marketplace;
-    const kebabBtn = m.isVirtual
-      ? ''
-      : `<button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${escAttrJs(m.name)}')" title="Marketplace info">${ICONS.kebab}</button>`;
+    const kebabBtn =
+      m.isVirtual || m.isManaged
+        ? ''
+        : `<button class="mkt-info-btn" onclick="event.stopPropagation(); showMarketplaceDetail('${escAttrJs(m.name)}')" title="Marketplace info">${ICONS.kebab}</button>`;
 
     let mktHeat = '';
     if (heatmapMode) {
@@ -798,7 +799,7 @@ function toggleHeatmap() {
 }
 
 function renderScopeToggles(plugin) {
-  const scopes = ['user', 'project', 'local'];
+  const scopes = Object.keys(plugin.scopeDetails);
   const toggles = scopes
     .map((s) => {
       const detail = plugin.scopeDetails[s];
@@ -882,7 +883,9 @@ async function showDetail(pluginId) {
     : `<div class="detail-meta-row">
         <span class="detail-meta-item">from ${esc(mName)}</span>
         ${sourceBadge(marketplace?.source?.type)}
-      </div>`;
+        ${plugin.isManaged ? '<span class="detail-meta-item">Managed by your organization</span>' : ''}
+      </div>
+      ${plugin.shadowedBy ? `<div class="detail-meta-row"><span class="detail-meta-item">Not loaded: ${esc(plugin.shadowedBy)} has the same name and takes precedence</span></div>` : ''}`;
 
   panel.innerHTML = `
     <div class="detail-header">
@@ -935,23 +938,27 @@ function updateButtons(plugin) {
 }
 
 function renderScopeMatrix(plugin) {
-  const scopes = ['user', 'project', 'local'];
+  const scopes = Object.keys(plugin.scopeDetails);
   return `<div class="scope-matrix">${scopes
     .map((s) => {
       const d = plugin.scopeDetails[s];
       let status, actions;
+      // The CLI can only enable or disable an org plugin.
+      const remove = plugin.isManaged
+        ? ''
+        : `<button class="action-btn danger" onclick="runAction('uninstall', '${escAttrJs(plugin.fullId)}', '${s}')">Remove</button>`;
 
       if (d.installed && d.enabled) {
         status = `Enabled${d.version ? ` \u00B7 v${esc(d.version)}` : ''}`;
         actions = `
         <button class="action-btn" onclick="runAction('disable', '${escAttrJs(plugin.fullId)}', '${s}')">Disable</button>
-        <button class="action-btn danger" onclick="runAction('uninstall', '${escAttrJs(plugin.fullId)}', '${s}')">Remove</button>
+        ${remove}
       `;
       } else if (d.installed && !d.enabled) {
         status = `Disabled${d.version ? ` \u00B7 v${esc(d.version)}` : ''}`;
         actions = `
         <button class="action-btn primary" onclick="runAction('enable', '${escAttrJs(plugin.fullId)}', '${s}')">Enable</button>
-        <button class="action-btn danger" onclick="runAction('uninstall', '${escAttrJs(plugin.fullId)}', '${s}')">Remove</button>
+        ${remove}
       `;
       } else {
         status = 'Not installed';
@@ -1755,6 +1762,7 @@ function sourceBadge(type) {
   if (type === 'github') return '<span class="badge badge-github">GitHub</span>';
   if (type === 'directory') return '<span class="badge badge-directory">Local</span>';
   if (type === 'git') return '<span class="badge badge-git">Git</span>';
+  if (type === 'org') return '<span class="badge badge-org">Org</span>';
   return `<span class="badge" style="background:var(--accent-dim);color:var(--accent)">${esc(type || '?')}</span>`;
 }
 
@@ -1864,7 +1872,7 @@ function openAddMarketplace() {
 
 function renderMarketplaceList() {
   const container = document.getElementById('marketplaceList');
-  const real = marketplaces.filter((m) => !m.isVirtual);
+  const real = marketplaces.filter((m) => !m.isVirtual && !m.isManaged);
   if (!real.length) {
     container.innerHTML = '<div class="mkt-list-empty">No marketplaces registered</div>';
     return;
