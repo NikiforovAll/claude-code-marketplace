@@ -1859,7 +1859,7 @@ function closeModal(id) {
 
 // Vimium eats Escape inside a text input and only blurs it, so the page never sees the key.
 // A blur that no click in the modal caused, while the window keeps focus and the input is
-// still shown, is that Escape.
+// still shown, and that sends focus nowhere inside the modal (Tab does), is that Escape.
 function onEscapeBlur(input, modal, handler) {
   let pointerDown = false;
   modal.addEventListener('mousedown', () => {
@@ -1868,7 +1868,8 @@ function onEscapeBlur(input, modal, handler) {
   document.addEventListener('mouseup', () => {
     pointerDown = false;
   });
-  input.addEventListener('blur', () => {
+  input.addEventListener('blur', (e) => {
+    if (modal.contains(e.relatedTarget)) return;
     if (!pointerDown && document.hasFocus() && input.checkVisibility()) handler();
   });
 }
