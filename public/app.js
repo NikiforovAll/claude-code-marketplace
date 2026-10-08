@@ -73,6 +73,7 @@ ICONS.settings = ICONS.gear;
 ICONS.claudeMd = ICONS.readme;
 ICONS.agentsMd = ICONS.readme;
 ICONS.agentSkills = ICONS.skills;
+ICONS.syncedSkills = ICONS.skills;
 ICONS.openEditor =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17.583 2.207a1.1 1.1 0 0 1 1.541.033l2.636 2.636a1.1 1.1 0 0 1 .033 1.541L10.68 17.53a1.1 1.1 0 0 1-.345.247l-4.56 1.903a.55.55 0 0 1-.725-.725l1.903-4.56a1.1 1.1 0 0 1 .247-.345zm.902 1.87-8.794 8.793-.946 2.268 2.268-.946 8.794-8.793z"/></svg>';
 ICONS.copyPath =
@@ -98,6 +99,7 @@ const COMP_LABELS = {
   claudeMd: 'CLAUDE.md',
   agentsMd: 'AGENTS.md',
   agentSkills: 'Agent Skills (not-supported)',
+  syncedSkills: 'Synced skills (claude.ai)',
   readme: 'README',
 };
 
@@ -1055,12 +1057,13 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
           html += '<div class="detail-comp-items">';
           for (const name of names) {
             const mod = type === 'mods' ? comps._mods?.[name] : null;
-            const clickPath = mod?.path || configFile || (dir ? `${dir}/${name}` : name);
+            const synced = type === 'syncedSkills' ? comps._syncedSkills?.[name] : null;
+            const clickPath = mod?.path || synced || configFile || (dir ? `${dir}/${name}` : name);
             const cls = hasDirAccess ? '' : ' disabled';
             const click = hasDirAccess
               ? ` onclick="openContentModal('${escAttrJs(pluginId)}', '${escAttrJs(clickPath)}', '${escAttrJs(type)}')"`
               : '';
-            const isFolder = type === 'skills' || type === 'agentSkills';
+            const isFolder = type === 'skills' || type === 'agentSkills' || type === 'syncedSkills';
             const label = compItemLabel(type, name, names.length);
             const hit = compHits && compMatchesSearch(label) ? ' search-hit' : '';
             html += `<div class="detail-comp-item${cls}${hit}"${click}>

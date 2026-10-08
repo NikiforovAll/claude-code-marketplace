@@ -8,6 +8,7 @@ const { createNetGuard } = require('./lib/net-guard');
 const { isContainedAny } = require('./lib/contain');
 const {
   countComponents,
+  skillDirsIn,
   COMPONENT_KEYS,
   INLINE_PREFIX,
   findFiles,
@@ -238,11 +239,11 @@ function buildComponents(fsComps, pd = {}) {
 const SYNCED_DIR = path.join(PLUGINS_DIR, 'synced');
 const SYNCED_MARKETPLACE = 'synced';
 
-function listSyncedBuckets() {
+function listSyncedBuckets(root = SYNCED_DIR) {
   try {
-    return fs.readdirSync(SYNCED_DIR, { withFileTypes: true })
+    return fs.readdirSync(root, { withFileTypes: true })
       .filter(e => e.isDirectory() && !e.name.startsWith('.'))
-      .map(e => path.join(SYNCED_DIR, e.name));
+      .map(e => path.join(root, e.name));
   } catch {
     return [];
   }
@@ -469,6 +470,22 @@ const VIRTUAL_PREFIX = '_custom/';
 const SCOPE_LABELS = { user: 'User Customizations', project: 'Project Customizations' };
 const EMPTY_SCOPE = { installed: false, enabled: false, version: null, installPath: null };
 
+// Claude Code syncs the skills turned on for the claude.ai account to
+// skills/synced/<org>_<user>/<name>/ and loads them like user skills. The layout is
+// undocumented; verified against Claude Code 2.1.x.
+function scanSyncedSkills(basePath) {
+  const relPaths = {};
+  for (const bucket of listSyncedBuckets(path.join(basePath, 'skills', 'synced'))) {
+    // Claude Code can replace a bucket while this scan runs.
+    let names;
+    try { names = skillDirsIn(bucket); } catch { continue; }
+    for (const name of names) {
+      if (!Object.hasOwn(relPaths, name)) relPaths[name] = `skills/synced/${path.basename(bucket)}/${name}`;
+    }
+  }
+  return relPaths;
+}
+
 function rescanVirtualComponents(basePath, scope) {
   const components = countComponents(basePath);
   // Strip .md extensions from command/agent names for cleaner display
@@ -505,6 +522,15 @@ function rescanVirtualComponents(basePath, scope) {
   if (scope === 'project') {
     const parentAgents = path.join(basePath, '..', 'AGENTS.md');
     if (fs.existsSync(parentAgents)) components.agentsMd = ['~root/AGENTS.md'];
+  }
+
+  if (scope === 'user') {
+    const synced = scanSyncedSkills(basePath);
+    const names = Object.keys(synced).sort((a, b) => a.localeCompare(b));
+    if (names.length) {
+      components.syncedSkills = names;
+      components._syncedSkills = synced;
+    }
   }
 
   const agentSkillsDir = path.join(basePath, '..', '.agents', 'skills');

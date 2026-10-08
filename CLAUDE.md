@@ -33,7 +33,7 @@ No build step. No framework. Static files served directly by Express.
 
 Resolution follows the [plugin manifest schema](https://www.schemastore.org/claude-code-plugin-manifest.json): a key is declared by the marketplace entry, else the plugin manifest's top level, else its `experimental` block (the older spelling for `monitors`). A declaration takes an inline value, a `./x.json` path, or an array mixing both, and is **additive** to the conventional file or directory rather than replacing it. Declared paths are containment-checked; the table's own defaults are literals and are not. A component declared inline gets `INLINE_PREFIX` in `_configFiles` so the preview route renders the declared block instead of opening a file.
 
-**Virtual Marketplaces**: User and project customizations shown as synthetic marketplace entries from local filesystem.
+**Virtual Marketplaces**: User and project customizations shown as synthetic marketplace entries from local filesystem. User customizations also list `skills/synced/<org>_<user>/<name>/` (skills synced from the claude.ai account) as `syncedSkills`; `_syncedSkills` maps each name to its relative path for the preview.
 
 **Caching**: In-memory marketplace cache invalidated on plugin operations.
 

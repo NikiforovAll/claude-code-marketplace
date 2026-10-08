@@ -25,6 +25,11 @@ function makeConfigDir({ known = true } = {}) {
   write(path.join(bucket, 'team', 'skills', 'team-context', 'SKILL.md'), '---\nname: team-context\n---\n');
   write(path.join(bucket, 'harness', '.claude-plugin', 'plugin.json'), { name: 'harness' });
   mkdirSync(path.join(dir, 'plugins', 'synced', '.staging'), { recursive: true });
+  const skillBucket = path.join(dir, 'skills', 'synced', 'org_user');
+  write(path.join(skillBucket, 'pptx', 'SKILL.md'), '---\nname: pptx\n---\n');
+  write(path.join(skillBucket, 'docs', 'SKILL.md'), '---\nname: docs\n---\n');
+  write(path.join(skillBucket, 'manifest.json'), { skills: [] });
+  write(path.join(dir, 'skills', 'mine', 'SKILL.md'), '---\nname: mine\n---\n');
   write(path.join(dir, 'settings.json'), { enabledPlugins: { 'harness@synced': false } });
   write(path.join(dir, 'plugins', 'installed_plugins.json'), {
     plugins: { 'harness@other': [{ scope: 'user', installPath: '', version: '1.0.0' }] },
@@ -100,6 +105,17 @@ describe('org marketplaces synced from claude.ai', () => {
     const res = await fetch(`${server.base}/api/plugins/team%40synced/preview/skills/team-context/SKILL.md`);
     assert.equal(res.status, 200);
     assert.match((await res.json()).content, /team-context/);
+  });
+
+  it('lists synced claude.ai skills apart from user skills, and previews them', async () => {
+    const user = marketplaces.flatMap((m) => m.plugins).find((p) => p.fullId === '_custom/user');
+    assert.deepEqual(user.components.skills, ['mine']);
+    assert.deepEqual(user.components.syncedSkills, ['docs', 'pptx']);
+    const rel = user.components._syncedSkills.pptx;
+    assert.equal(rel, 'skills/synced/org_user/pptx');
+    const res = await fetch(`${server.base}/api/plugins/_custom%2Fuser/preview/${rel}/SKILL.md`);
+    assert.equal(res.status, 200);
+    assert.match((await res.json()).content, /pptx/);
   });
 });
 
