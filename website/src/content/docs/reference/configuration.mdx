@@ -86,11 +86,13 @@ The path must be an existing directory, or you get `Directory does not exist`. A
 
 When the page loads, it picks the project in this order:
 
-1. The project that Claude Code Hub sends, when the page runs inside the hub.
-2. A `?project=<path>` URL parameter.
+1. A `?project=<path>` URL parameter.
+2. The project that Claude Code Hub sends, when the page runs inside the hub.
 3. The `--project` flag, if you started the server with it.
 4. The most recent project in the picker list.
 5. The directory where you started the server.
+
+Inside the hub, a project that the hub sends after the page loads still switches the project.
 
 ## Themes and layout
 
@@ -98,7 +100,7 @@ When the page loads, it picks the project in this order:
 
 The top bar has a light/dark toggle, and <kbd>T</kbd> switches it too. Without a saved choice, the page follows the light or dark setting of your OS.
 
-The color theme picker has 17 themes. Each one has a light and a dark variant: Ember (default), Gruvbox, Catppuccin, Tokyo Night, Solarized, Dracula, Nord, Rosé Pine, Everforest, Kanagawa, One Dark, Night Owl, Monokai Pro, GitHub, Ayu, Vitesse, and Synthwave '84.
+The color theme picker has 17 themes. Each one has a light and a dark variant: Ember (default), Gruvbox, Catppuccin, Tokyo Night, Solarized, Dracula, Nord, Rosé Pine, Everforest, Kanagawa, One Dark, Night Owl, Monokai Pro, GitHub, Ayu, Vitesse, and Synthwave '84. Inside Claude Code Hub, the picker lists the hub's themes in place of these.
 
 To change the width of the tree panel, drag the handle between the tree and the detail panel. The minimum width is 200 px, and the detail panel keeps its own minimum width.
 
