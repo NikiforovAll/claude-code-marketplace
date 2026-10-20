@@ -1097,6 +1097,18 @@ body.light .scope-toggle.local {
   background: none;
   color: var(--text-tertiary);
 }
+.detail-comp-item.described {
+  flex-wrap: wrap;
+}
+.detail-comp-item.disabled.described {
+  opacity: 1;
+}
+.comp-desc {
+  flex-basis: 100%;
+  padding-left: 22px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
 /* after the hover and disabled rules: equal specificity, so source order decides */
 .detail-comp-item.search-hit {
   background: var(--accent-dim);

@@ -889,7 +889,7 @@ async function showDetail(pluginId) {
     : `<div class="detail-meta-row">
         <span class="detail-meta-item">from ${esc(mName)}</span>
         ${sourceBadge(marketplace?.source?.type)}
-        ${plugin.isManaged ? '<span class="detail-meta-item">Managed by your organization</span>' : ''}
+        ${plugin.isBuiltin ? '<span class="detail-meta-item">Ships with Claude Code</span>' : plugin.isManaged ? '<span class="detail-meta-item">Managed by your organization</span>' : ''}
       </div>
       ${plugin.shadowedBy ? `<div class="detail-meta-row"><span class="detail-meta-item">Not loaded: ${esc(plugin.shadowedBy)} has the same name and takes precedence</span></div>` : ''}`;
 
@@ -1066,11 +1066,13 @@ function renderDetailComponents(pluginId, comps, hasDirAccess) {
             const isFolder = type === 'skills' || type === 'agentSkills' || type === 'syncedSkills';
             const label = compItemLabel(type, name, names.length);
             const hit = compHits && compMatchesSearch(label) ? ' search-hit' : '';
-            html += `<div class="detail-comp-item${cls}${hit}"${click}>
+            const about = comps._descriptions?.[type]?.[name];
+            html += `<div class="detail-comp-item${cls}${about ? ' described' : ''}${hit}"${click}>
             <span class="icon">${isFolder ? ICONS.folder : ICONS.file}</span>
             <span class="hl-fit">${hl(label)}</span>
             ${modEventTags(mod)}
             ${heatBadgeFor(pluginId, type, name)}
+            ${about ? `<span class="comp-desc">${hl(about)}</span>` : ''}
           </div>`;
           }
           html += '</div>';
@@ -1777,6 +1779,7 @@ function sourceBadge(type) {
   if (type === 'directory') return '<span class="badge badge-directory">Local</span>';
   if (type === 'git') return '<span class="badge badge-git">Git</span>';
   if (type === 'org') return '<span class="badge badge-org">Org</span>';
+  if (type === 'builtin') return '<span class="badge badge-org">Built-in</span>';
   return `<span class="badge" style="background:var(--accent-dim);color:var(--accent)">${esc(type || '?')}</span>`;
 }
 

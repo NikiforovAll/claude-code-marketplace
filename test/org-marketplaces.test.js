@@ -39,7 +39,12 @@ function makeConfigDir({ known = true } = {}) {
 }
 
 function startServer(dir) {
-  const env = { ...process.env };
+  const env = {
+    ...process.env,
+    CCM_BUILTIN_PROBE_SCRIPT: path.join(__dirname, 'fixtures', 'fake-claude.js'),
+    CCM_BUILTIN_CACHE_DIR: dir,
+    FAKE_CLAUDE_MODE: 'exit',
+  };
   delete env.HUB_SDK_SERVER;
   delete env.CLAUDE_CONFIG_DIR;
   const child = spawn(process.execPath, [path.join(__dirname, '..', 'server.js'), '--dir', dir, '--port', '0'], {

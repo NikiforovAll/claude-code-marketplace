@@ -6,6 +6,7 @@ const os = require('node:os');
 const { openInEditor, execNoShell } = require('./lib/open-editor');
 const { createNetGuard } = require('./lib/net-guard');
 const { isContainedAny } = require('./lib/contain');
+const { createBuiltinRegistry, isBuiltinId, builtinName, builtinId } = require('./lib/builtins');
 const {
   countComponents,
   skillDirsIn,
@@ -64,6 +65,20 @@ function getCachedMarketplaces() {
   return _marketplaceCache;
 }
 function invalidateCache() { _marketplaceCache = null; }
+
+// CCM_BUILTIN_PROBE_SCRIPT runs a node script in place of claude, for tests.
+const builtins = createBuiltinRegistry({
+  claudeDir: CLAUDE_DIR,
+  userEnabled: () => readJsonKey(path.join(CLAUDE_DIR, 'settings.json'), 'enabledPlugins'),
+  env: CLI_ENV,
+  cwd: os.tmpdir(),
+  command: process.env.CCM_BUILTIN_PROBE_SCRIPT
+    ? { file: process.execPath, args: [process.env.CCM_BUILTIN_PROBE_SCRIPT] }
+    : null,
+  cacheDir: process.env.CCM_BUILTIN_CACHE_DIR || null,
+  onChange: invalidateCache,
+  log: console.log,
+});
 
 function getArg(name) {
   const idx = process.argv.findIndex(a => a.startsWith(`--${name}`));
@@ -293,10 +308,45 @@ function loadOrgMarketplaces(registry) {
   return [...byName.values()];
 }
 
+const BUILTIN_MARKETPLACE = 'Built-in';
+
+// The probe lists only loaded built-ins, so a disabled one is found through its
+// enabledPlugins key. The CLI can only enable or disable a built-in, at user scope.
+function loadBuiltinMarketplace(registry) {
+  const names = new Set(builtins.names());
+  for (const id of Object.keys(registry.userEnabled)) {
+    if (isBuiltinId(id)) names.add(builtinName(id));
+  }
+  if (!names.size) return [];
+  const plugins = [...names].filter(isName).sort().map((name) => {
+    const fullId = builtinId(name);
+    const enabled = registry.userEnabled[fullId] !== false;
+    return {
+      name,
+      fullId,
+      description: builtins.description(name),
+      version: null,
+      isInstalled: true,
+      isEnabled: enabled,
+      isManaged: true,
+      isBuiltin: true,
+      scopeDetails: { user: { installed: true, enabled, version: null } },
+      components: builtins.components(name) || {},
+      _pluginDir: null,
+      metadata: {},
+    };
+  });
+  return [{ name: BUILTIN_MARKETPLACE, source: { type: 'builtin' }, isManaged: true, isBuiltin: true, plugins }];
+}
+
+function isKnownBuiltin(pluginId) {
+  return getCachedMarketplaces().some((m) => m.isBuiltin && m.plugins.some((p) => p.fullId === pluginId));
+}
+
 function loadMarketplaces() {
   const known = readJsonSafe(KNOWN_MARKETPLACES_FILE);
   const registry = loadRegistry();
-  const orgMarketplaces = loadOrgMarketplaces(registry);
+  const orgMarketplaces = [...loadBuiltinMarketplace(registry), ...loadOrgMarketplaces(registry)];
   if (!known) return orgMarketplaces;
 
   const scope = buildScopeData(registry);
@@ -851,6 +901,7 @@ app.put('/api/project', (req, res) => {
 
 app.post('/api/refresh', (req, res) => {
   invalidateCache();
+  builtins.refresh();
   res.json({ ok: true });
 });
 
@@ -924,6 +975,11 @@ for (const verb of ['install', 'uninstall', 'enable', 'disable', 'update']) {
     const { pluginId, scope } = req.body;
     if (!pluginId) return res.status(400).json({ error: 'pluginId required' });
     if (rejectVirtual(pluginId, res)) return;
+    // The CLI reports success for any <name>@builtin and writes the key.
+    if (isBuiltinId(pluginId)) {
+      if (verb !== 'enable' && verb !== 'disable') return res.status(400).json({ error: 'A built-in plugin can only be enabled or disabled' });
+      if (!isKnownBuiltin(pluginId)) return res.status(400).json({ error: 'Unknown built-in plugin' });
+    }
     try {
       const args = [verb, assertPluginId(pluginId)];
       const validScope = assertScope(scope);
@@ -969,6 +1025,7 @@ const onReady = (actual) => {
   if (process.argv.includes('--open')) {
     import('open').then(m => m.default(`http://localhost:${actual}`));
   }
+  builtins.start();
 };
 
 const server = net.listenLoopback(app, PORT, onReady);
