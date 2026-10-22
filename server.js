@@ -346,8 +346,9 @@ function isKnownBuiltin(pluginId) {
 function loadMarketplaces() {
   const known = readJsonSafe(KNOWN_MARKETPLACES_FILE);
   const registry = loadRegistry();
-  const orgMarketplaces = [...loadBuiltinMarketplace(registry), ...loadOrgMarketplaces(registry)];
-  if (!known) return orgMarketplaces;
+  const builtinMarketplaces = loadBuiltinMarketplace(registry);
+  const orgMarketplaces = loadOrgMarketplaces(registry);
+  if (!known) return [...orgMarketplaces, ...builtinMarketplaces];
 
   const scope = buildScopeData(registry);
 
@@ -513,6 +514,7 @@ function loadMarketplaces() {
     }
   }
 
+  marketplaces.push(...builtinMarketplaces);
   return marketplaces;
 }
 
