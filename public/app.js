@@ -2119,7 +2119,7 @@ function handleKeydown(e) {
     e.preventDefault();
     if (idx < 0) {
       const selIdx = selectedPluginId ? rows.findIndex((r) => r.dataset.rowId === selectedPluginId) : -1;
-      setFocusedRow(selIdx >= 0 ? selIdx : 0, rows);
+      setFocusedRow(Math.max(selIdx, 0), rows);
     } else {
       setFocusedRow(idx + 1, rows);
     }
@@ -2130,7 +2130,7 @@ function handleKeydown(e) {
     e.preventDefault();
     if (idx < 0) {
       const selIdx = selectedPluginId ? rows.findIndex((r) => r.dataset.rowId === selectedPluginId) : -1;
-      setFocusedRow(selIdx >= 0 ? selIdx : 0, rows);
+      setFocusedRow(Math.max(selIdx, 0), rows);
     } else {
       setFocusedRow(idx - 1, rows);
     }
