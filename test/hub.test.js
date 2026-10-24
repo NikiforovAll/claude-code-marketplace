@@ -18,6 +18,7 @@ async function loadHub() {
   const parent = { postMessage: (message, origin) => posted.push({ message, origin }) };
   const body = { classList: { contains: () => light }, dataset: {}, style: { setProperty() {}, removeProperty() {} } };
   let light = false;
+  const scopeSelect = { value: 'user' };
   const context = vm.createContext({
     parent,
     top: parent,
@@ -25,7 +26,16 @@ async function loadHub() {
     URLSearchParams,
     location: { search: '' },
     console,
-    document: { readyState: 'complete', addEventListener: on, getElementById: () => null, body },
+    document: {
+      readyState: 'complete',
+      addEventListener: on,
+      getElementById: (id) => (id === 'scopeFilter' ? scopeSelect : null),
+      body,
+    },
+    scopeFilter: 'user',
+    selectedPluginId: null,
+    renderTree: () => calls.push(['tree', context.scopeFilter, scopeSelect.value, context.selectedPluginId]),
+    showDetail: (id) => calls.push(['detail', id]),
     addEventListener: on,
     fetch: async () => ({ json: async () => ({ enabled: true, url: HUB }) }),
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
@@ -137,9 +147,12 @@ describe('hub messages', () => {
       ['put', 'C:/p'],
       ['render', 'C:/p'],
       ['load'],
+      ['tree', 'installed', 'installed', '_custom/project'],
       ['put', 'C:/q'],
       ['render', 'C:/q'],
       ['load'],
+      ['detail', '_custom/project'],
+      ['tree', 'installed', 'installed', '_custom/project'],
       ['put', 'C:/missing'],
       ['toast', 'not a directory', 'error'],
       ['put', 'C:/p'],

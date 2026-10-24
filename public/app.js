@@ -2421,8 +2421,20 @@ hub.subscribe('project.changed', (p) => {
 });
 
 // A link moves this app off the hub's project, and applyProject records that, so the next
-// project.changed still applies.
-hub.handle('project.plugins', (p) => {
-  if (p.project) applyProject(p.project).catch((err) => toast(err.message, 'error'));
+// project.changed still applies. Like the action's URL, a call opens that project's customizations
+// among the installed plugins.
+const PROJECT_CUSTOM_ID = '_custom/project';
+hub.handle('project.plugins', async (p) => {
+  if (!p.project) return;
+  scopeFilter = 'installed';
+  document.getElementById('scopeFilter').value = 'installed';
+  selectedPluginId = PROJECT_CUSTOM_ID;
+  renderTree();
+  try {
+    await applyProject(p.project);
+    showDetail(PROJECT_CUSTOM_ID);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
 });
 // #endregion HUB_INTEGRATION
